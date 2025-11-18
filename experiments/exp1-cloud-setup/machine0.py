@@ -9,6 +9,8 @@ import torch.distributed.autograd as dist_autograd
 import torch.distributed.rpc as rpc
 import torch.nn as nn
 import tyro
+import wandb
+from torch.utils.tensorboard.writer import SummaryWriter
 
 from env import make_env
 from network import ActorCriticNetwork, CNNNetwork
@@ -23,6 +25,7 @@ class Args:
     torch_deterministic: bool = True
     cuda: bool = False
     env_id: str = "CarRacing-v3"
+    technique: str = "cloud-setup"
 
     # Algorithm specific arguments
     total_timesteps: int = 500_000
@@ -79,8 +82,27 @@ def main():
     args.minibatch_size = int(args.batch_size // args.num_minibatches)
     args.num_iterations = args.total_timesteps // args.batch_size
 
-    run_name = f"{args.env_id}__{int(time.time())}"
+    run_name = f"{int(time.time())}-{args.technique}"
     print(f"Run: {run_name}")
+    
+    # Initialize wandb only if API key is provided
+    wandb_api_key = os.getenv("WANDB_API_KEY")
+    if wandb_api_key:
+        wandb.init(
+            project="data-paralellism-rl",
+            entity=None,
+            sync_tensorboard=True,
+            config=vars(args),
+            name=run_name,
+            save_code=True,
+            dir="/workspace/runs",
+        )
+        # Create TensorBoard writer in wandb's run directory for automatic syncing
+        writer = SummaryWriter(f"/workspace/runs/{run_name}")
+        print("wandb initialized successfully", flush=True)
+    else:
+        writer = SummaryWriter(f"/workspace/runs/{run_name}")
+        print("WANDB_API_KEY not found, skipping wandb initialization", flush=True)
 
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
     envs = gym.vector.SyncVectorEnv(
@@ -156,8 +178,9 @@ def main():
                     f"global_step={global_step}, episodic_return={ep_infos['r']}",
                     flush=True,
                 )
-                # writer.add_scalar("charts/episodic_return", ep_infos['r'][0], global_step)
-                # writer.add_scalar("charts/episodic_length", ep_infos['l'][0], global_step)
+                writer.add_scalar(
+                    "charts/episodic_return", ep_infos["r"][0], global_step
+                )
 
         # bootstrap value if not done
         with torch.no_grad():
@@ -258,13 +281,26 @@ def main():
 
             # if args.target_kl is not None and approx_kl > args.target_kl:
             #     break
+        
+        # Log training metrics
+        writer.add_scalar("losses/value_loss", v_loss.item(), global_step)
+        writer.add_scalar("losses/policy_loss", pg_loss.item(), global_step)
+        writer.add_scalar("losses/entropy", entropy_loss.item(), global_step)
 
-        # y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
-        # var_y = np.var(y_true)
-        # explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
+        y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
+        var_y = np.var(y_true)
+        explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
 
-        print(f"Time elapsed: {time.time() - start_time:.2f}s", flush=True)
+        time_elapsed = time.time() - start_time
+        print(f"Time elapsed: {time_elapsed:.2f}s", flush=True)
+        writer.add_scalar("charts/time_elapsed", time_elapsed, iteration)
+        writer.add_scalar("losses/explained_variance", explained_var, global_step)
+        writer.add_scalar("charts/learning_rate", args.learning_rate, global_step)
+        sps = int(global_step / time_elapsed)
+        print(f"SPS: {sps}")
+        writer.add_scalar("charts/SPS", sps, global_step)
 
+    writer.close()
     print("Machine shutting down", flush=True)
     time.sleep(1000)
 
