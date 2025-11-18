@@ -1,0 +1,42 @@
+services:
+  machine0:
+    build: .
+    command: machine0.py
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '0.5'
+    #       memory: 512M
+    volumes:
+      - ./runs:/workspace/runs
+    environment:
+      - RANK=0
+      - WORLD_SIZE=2
+      - MASTER_ADDR=machine0
+      - MASTER_PORT=29500
+    networks:
+      - net
+
+  machine1:
+    build: .
+    command: machine1.py
+    depends_on:
+      - machine0
+    # deploy:
+      # resources:
+      #   limits:
+      #     cpus: '0.5'
+      #     memory: 512M 
+    volumes:
+      - ./runs:/workspace/runs
+    environment:
+      - RANK=1
+      - WORLD_SIZE=2
+      - MASTER_ADDR=machine0
+      - MASTER_PORT=29500
+    networks:
+      - net
+
+networks:
+  net:
+    driver: bridge
