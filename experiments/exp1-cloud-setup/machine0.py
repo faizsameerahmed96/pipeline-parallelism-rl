@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 import gymnasium as gym
 import numpy as np
+import psutil
 import torch
 import torch.distributed.autograd as dist_autograd
 import torch.distributed.rpc as rpc
@@ -130,6 +131,10 @@ def main():
     next_obs, _ = envs.reset(seed=args.seed)
     next_obs = torch.Tensor(next_obs).to(device)
     next_done = torch.zeros(args.num_envs).to(device)
+    
+    # Track network transfer (cumulative)
+    net_io_start = psutil.net_io_counters()
+    bytes_start = net_io_start.bytes_sent + net_io_start.bytes_recv
 
     for iteration in range(1, args.num_iterations + 1):
         print(f"Iteration {iteration}/{args.num_iterations}", flush=True)
@@ -303,6 +308,11 @@ def main():
         print(f"SPS: {sps}")
         writer.add_scalar("charts/SPS", sps, global_step)
         
+        # Track cumulative network transfer
+        net_io_current = psutil.net_io_counters()
+        bytes_current = net_io_current.bytes_sent + net_io_current.bytes_recv
+        total_transfer_mb = (bytes_current - bytes_start) / (1024 * 1024)
+        writer.add_scalar("charts/network_transfer_in_mb", total_transfer_mb, iteration)
         
 
     writer.close()

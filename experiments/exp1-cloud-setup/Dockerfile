@@ -18,7 +18,8 @@ RUN pip install \
     "tyro>=0.5.10" \
     "swig>=4.3.1.post0" \
     "torchviz>=0.0.3" \
-    "torchinfo>=1.8.0"
+    "torchinfo>=1.8.0" \
+    "psutil>=5.9.0"
 
 WORKDIR /workspace
 COPY . /workspace
