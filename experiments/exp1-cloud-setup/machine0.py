@@ -44,6 +44,7 @@ class Args:
     vf_coef: float = 0.5
     max_grad_norm: float = 0.5
     target_kl: float | None = None
+    save_model_freq: int | None = 1
 
     # to be filled in runtime
     batch_size: int = 0
@@ -145,6 +146,20 @@ def main():
 
     for iteration in range(1, args.num_iterations + 1):
         print(f"Iteration {iteration}/{args.num_iterations}", flush=True)
+
+        # Save model checkpoint if save_model_freq is specified
+        if args.save_model_freq is not None and iteration % args.save_model_freq == 0:
+            checkpoint_dir = f"/workspace/runs/{run_name}/models/"
+            os.makedirs(checkpoint_dir, exist_ok=True)
+
+            checkpoint_path = f"{checkpoint_dir}iteration_{iteration}.pt"
+            torch.save({
+                'iteration': iteration,
+                'agent_state_dict': agent.state_dict(),
+                'args': vars(args),
+            }, checkpoint_path)
+            print(f"Model saved to {checkpoint_path}", flush=True)
+
         # Rollout
         for step in range(0, args.num_steps):
             global_step += args.num_envs
@@ -299,6 +314,8 @@ def main():
         sps = int(global_step / time_elapsed)
         print(f"SPS: {sps}")
         writer.add_scalar("charts/SPS", sps, global_step)
+        
+        
 
     writer.close()
     print("Machine shutting down", flush=True)
