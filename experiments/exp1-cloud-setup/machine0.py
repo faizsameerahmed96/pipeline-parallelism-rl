@@ -49,32 +49,19 @@ class Args:
     # to be filled in runtime
     batch_size: int = 0
     minibatch_size: int = 0
-    num_iterations: int = 0
+    num_iterations: int = 25
 
 
 def _call_method(method, rref, *args, **kwargs):
+    # Runs in remote machine's context
     return method(rref.local_value(), *args, **kwargs)
-
-
-def _remote_method(method, rref, *args, **kwargs):
-    owner = rref.owner()
-    return rpc.rpc_sync(owner, _call_method, args=(method, rref, *args), kwargs=kwargs)
-
-
-def _call_method_no_grad(method, rref, *args, **kwargs):
-    with torch.no_grad():
-        return method(rref.local_value(), *args, **kwargs)
-
 
 def _parameter_rrefs(module):
     return [RRef(parameter) for parameter in module.parameters()]
 
-
-def _remote_method_no_grad(method, rref, *args, **kwargs):
+def _remote_method(method, rref, *args, **kwargs):
     owner = rref.owner()
-    return rpc.rpc_sync(
-        owner, _call_method_no_grad, args=(method, rref, *args), kwargs=kwargs
-    )
+    return rpc.rpc_sync(owner, _call_method, args=(method, rref, *args), kwargs=kwargs)
 
 
 def main():
@@ -168,10 +155,11 @@ def main():
 
             with torch.no_grad():
                 cnn_features = agent(next_obs)
-                action, logprob, _, value = _remote_method_no_grad(
+                action, logprob, _, value = _remote_method(
                     ActorCriticNetwork.get_action_and_value,
                     remote_agent_rref,
                     cnn_features,
+                    no_grad=True
                 )
                 values[step] = value.flatten()
 
@@ -201,7 +189,7 @@ def main():
         with torch.no_grad():
             cnn_features = agent(next_obs)
             next_value = _remote_method_no_grad(
-                ActorCriticNetwork.get_value, remote_agent_rref, cnn_features
+                ActorCriticNetwork.get_value, remote_agent_rref, cnn_features, no_grad=True
             )
             next_value = next_value.reshape(1, -1)
             advantages = torch.zeros_like(rewards).to(device)

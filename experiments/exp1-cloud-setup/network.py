@@ -60,7 +60,15 @@ class ActorCriticNetwork(nn.Module):
         #     sample_input = torch.zeros(1, *envs.single_observation_space.shape)
         #     cnn_output_size = self.cnn(sample_input).shape[1]
 
-    def get_action_and_value(self, features, action=None):
+    def get_action_and_value(self, features, action=None, no_grad=False):
+        if no_grad:
+            with torch.no_grad():
+                return self._get_action_and_value(features, action)
+        else:
+            return self._get_action_and_value(features, action)
+    
+
+    def _get_action_and_value(self, features, action=None):
         action_mean = self.actor_mean(features)
         action_logstd = self.actor_logstd.expand_as(action_mean)
 
@@ -82,7 +90,10 @@ class ActorCriticNetwork(nn.Module):
         entropy_2 = base_dist.entropy().sum(1)
             
         return action, log_prob, entropy_2, self.critic(features)
-    
 
-    def get_value(self, cnn_features):
-        return self.critic(cnn_features)
+    def get_value(self, cnn_features, no_grad=False):
+        if no_grad:
+            with torch.no_grad():
+                return self.critic(cnn_features)
+        else:
+            return self.critic(cnn_features)
