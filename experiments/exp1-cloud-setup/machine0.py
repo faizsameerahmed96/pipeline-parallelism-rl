@@ -45,7 +45,7 @@ class Args:
     vf_coef: float = 0.5
     max_grad_norm: float = 0.5
     target_kl: float | None = None
-    save_model_freq: int | None = 1
+    save_model_freq: int | None = 10
 
     # to be filled in runtime
     batch_size: int = 0
@@ -193,7 +193,7 @@ def main():
         # bootstrap value if not done
         with torch.no_grad():
             cnn_features = agent(next_obs)
-            next_value = _remote_method_no_grad(
+            next_value = _remote_method(
                 ActorCriticNetwork.get_value, remote_agent_rref, cnn_features, no_grad=True
             )
             next_value = next_value.reshape(1, -1)
@@ -312,7 +312,7 @@ def main():
         net_io_current = psutil.net_io_counters()
         bytes_current = net_io_current.bytes_sent + net_io_current.bytes_recv
         total_transfer_mb = (bytes_current - bytes_start) / (1024 * 1024)
-        writer.add_scalar("charts/network_transfer_in_mb", total_transfer_mb, iteration)
+        writer.add_scalar("charts/network_transfer_in_mb", total_transfer_mb, global_step)
         
 
     writer.close()
