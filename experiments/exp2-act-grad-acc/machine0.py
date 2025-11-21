@@ -23,7 +23,7 @@ class Args:
     torch_deterministic: bool = True
     cuda: bool = False
     env_id: str = "CarRacing-v3"
-    technique: str = "cloud-setup"
+    technique: str = "cloud-setup-manual"
 
     # Algorithm specific arguments
     total_timesteps: int = 500_000
@@ -182,6 +182,7 @@ def main():
                     "charts/episodic_return", ep_infos["r"][0], global_step
                 )
 
+        print("BOOTSTRAPPING")
         # bootstrap value if not done
         with torch.no_grad():
             cnn_features = cnn_network(next_obs)
@@ -223,6 +224,7 @@ def main():
         v_loss = torch.tensor(0.0)
         entropy_loss = torch.tensor(0.0)
 
+        print("UPDATING THE N/W")
         for epoch in range(args.update_epochs):
             np.random.shuffle(b_inds)
             for start in range(0, args.batch_size, args.minibatch_size):
@@ -232,27 +234,22 @@ def main():
                 # Forward pass through CNN with gradients enabled
                 cnn_features = cnn_network(b_obs[mb_inds])
                 
-                # Import the backward_and_step function from machine1
-                import machine1
-                
-                # Send features and loss components to machine1 for backward pass
+                # Send features and loss components to machine1 for backward pass via RRef
                 # Machine1 will compute loss, backward, and return feature gradients
-                feature_grads, pg_loss_val, v_loss_val, entropy_loss_val = rpc.rpc_sync(
-                    "worker1",
-                    machine1.backward_and_step,
-                    args=(
-                        cnn_features.detach(),
-                        b_actions[mb_inds],
-                        b_logprobs[mb_inds],
-                        b_advantages[mb_inds],
-                        b_returns[mb_inds],
-                        b_values[mb_inds],
-                        args.clip_coef,
-                        args.vf_coef,
-                        args.ent_coef,
-                        args.norm_adv,
-                        args.clip_vloss,
-                    )
+                feature_grads, pg_loss_val, v_loss_val, entropy_loss_val = _remote_method(
+                    ActorCriticNetwork.backward_and_step,
+                    remote_actor_critic_network_rref,
+                    cnn_features.detach(),
+                    b_actions[mb_inds],
+                    b_logprobs[mb_inds],
+                    b_advantages[mb_inds],
+                    b_returns[mb_inds],
+                    b_values[mb_inds],
+                    args.clip_coef,
+                    args.vf_coef,
+                    args.ent_coef,
+                    args.norm_adv,
+                    args.clip_vloss,
                 )
                 
                 # Now perform backward pass on machine0 using received gradients
