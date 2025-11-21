@@ -101,16 +101,16 @@ def main():
         ]
     )
 
-    agent = CNNNetwork(envs).to(device)
+    cnn_network = CNNNetwork(envs).to(device)
 
-    remote_agent_rref = rpc.remote("worker1", ActorCriticNetwork)
+    remote_actor_critic_network_rref = rpc.remote("worker1", ActorCriticNetwork)
     print(f"Remote reference to worker1 obtained.", flush=True)
 
-    remote_param_rrefs = _remote_method(_parameter_rrefs, remote_agent_rref)
-    local_param_rrefs = [RRef(parameter) for parameter in agent.parameters()]
+    remote_actor_critic_params_rrefs = _remote_method(_parameter_rrefs, remote_actor_critic_network_rref)
+    local_param_rrefs = [RRef(parameter) for parameter in cnn_network.parameters()]
     optimizer = DistributedOptimizer(
         torch.optim.Adam,
-        remote_param_rrefs + local_param_rrefs,
+        remote_actor_critic_params_rrefs + local_param_rrefs,
         lr=1e-5,
     )
 
@@ -147,7 +147,7 @@ def main():
             checkpoint_path = f"{checkpoint_dir}iteration_{iteration}.pt"
             torch.save({
                 'iteration': iteration,
-                'agent_state_dict': agent.state_dict(),
+                'agent_state_dict': cnn_network.state_dict(),
                 'args': vars(args),
             }, checkpoint_path)
             print(f"Model saved to {checkpoint_path}", flush=True)
@@ -159,10 +159,10 @@ def main():
             dones[step] = next_done
 
             with torch.no_grad():
-                cnn_features = agent(next_obs)
+                cnn_features = cnn_network(next_obs)
                 action, logprob, _, value = _remote_method(
                     ActorCriticNetwork.get_action_and_value,
-                    remote_agent_rref,
+                    remote_actor_critic_network_rref,
                     cnn_features,
                     no_grad=True
                 )
@@ -192,9 +192,9 @@ def main():
 
         # bootstrap value if not done
         with torch.no_grad():
-            cnn_features = agent(next_obs)
+            cnn_features = cnn_network(next_obs)
             next_value = _remote_method(
-                ActorCriticNetwork.get_value, remote_agent_rref, cnn_features, no_grad=True
+                ActorCriticNetwork.get_value, remote_actor_critic_network_rref, cnn_features, no_grad=True
             )
             next_value = next_value.reshape(1, -1)
             advantages = torch.zeros_like(rewards).to(device)
@@ -233,10 +233,10 @@ def main():
                 mb_inds = b_inds[start:end]
 
                 with dist_autograd_context() as context_id:
-                    cnn_features = agent(b_obs[mb_inds])
+                    cnn_features = cnn_network(b_obs[mb_inds])
                     _, newlogprob, entropy, newvalue = _remote_method(
                         ActorCriticNetwork.get_action_and_value,
-                        remote_agent_rref,
+                        remote_actor_critic_network_rref,
                         cnn_features,
                         b_actions[mb_inds],
                     )
@@ -284,7 +284,7 @@ def main():
 
                     dist_autograd.backward(context_id, [loss])
 
-                    nn.utils.clip_grad_norm_(agent.parameters(), args.max_grad_norm)
+                    nn.utils.clip_grad_norm_(cnn_network.parameters(), args.max_grad_norm)
                     optimizer.step(context_id)
 
             # if args.target_kl is not None and approx_kl > args.target_kl:
