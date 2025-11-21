@@ -6,7 +6,6 @@ import gymnasium as gym
 import numpy as np
 import psutil
 import torch
-import torch.distributed.autograd as dist_autograd
 import torch.distributed.rpc as rpc
 import torch.nn as nn
 import tyro
@@ -15,8 +14,6 @@ from torch.utils.tensorboard.writer import SummaryWriter
 
 from env import make_env
 from network import ActorCriticNetwork, CNNNetwork
-from torch.distributed.autograd import context as dist_autograd_context
-from torch.distributed.optim import DistributedOptimizer
 from torch.distributed.rpc import RRef
 
 
@@ -106,13 +103,8 @@ def main():
     remote_actor_critic_network_rref = rpc.remote("worker1", ActorCriticNetwork)
     print(f"Remote reference to worker1 obtained.", flush=True)
 
-    remote_actor_critic_params_rrefs = _remote_method(_parameter_rrefs, remote_actor_critic_network_rref)
-    local_param_rrefs = [RRef(parameter) for parameter in cnn_network.parameters()]
-    optimizer = DistributedOptimizer(
-        torch.optim.Adam,
-        remote_actor_critic_params_rrefs + local_param_rrefs,
-        lr=1e-5,
-    )
+    # Create local optimizer for CNN network only
+    optimizer = torch.optim.Adam(cnn_network.parameters(), lr=args.learning_rate)
 
     # store information from rollout
     obs = torch.zeros(
@@ -225,6 +217,11 @@ def main():
         # Optimizing the policy and value network
         b_inds = np.arange(args.batch_size)
         clipfracs = []
+        
+        # Initialize loss variables for logging
+        pg_loss = torch.tensor(0.0)
+        v_loss = torch.tensor(0.0)
+        entropy_loss = torch.tensor(0.0)
 
         for epoch in range(args.update_epochs):
             np.random.shuffle(b_inds)
@@ -232,60 +229,46 @@ def main():
                 end = start + args.minibatch_size
                 mb_inds = b_inds[start:end]
 
-                with dist_autograd_context() as context_id:
-                    cnn_features = cnn_network(b_obs[mb_inds])
-                    _, newlogprob, entropy, newvalue = _remote_method(
-                        ActorCriticNetwork.get_action_and_value,
-                        remote_actor_critic_network_rref,
-                        cnn_features,
+                # Forward pass through CNN with gradients enabled
+                cnn_features = cnn_network(b_obs[mb_inds])
+                
+                # Import the backward_and_step function from machine1
+                import machine1
+                
+                # Send features and loss components to machine1 for backward pass
+                # Machine1 will compute loss, backward, and return feature gradients
+                feature_grads, pg_loss_val, v_loss_val, entropy_loss_val = rpc.rpc_sync(
+                    "worker1",
+                    machine1.backward_and_step,
+                    args=(
+                        cnn_features.detach(),
                         b_actions[mb_inds],
+                        b_logprobs[mb_inds],
+                        b_advantages[mb_inds],
+                        b_returns[mb_inds],
+                        b_values[mb_inds],
+                        args.clip_coef,
+                        args.vf_coef,
+                        args.ent_coef,
+                        args.norm_adv,
+                        args.clip_vloss,
                     )
-                    logratio = newlogprob - b_logprobs[mb_inds]
-                    ratio = logratio.exp()
-
-                    # with torch.no_grad():
-                    #     # calculate approx_kl http://joschu.net/blog/kl-approx.html
-                    #     old_approx_kl = (-logratio).mean()
-                    #     approx_kl = ((ratio - 1) - logratio).mean()
-                    #     clipfracs += [((ratio - 1.0).abs() > args.clip_coef).float().mean().item()]
-
-                    mb_advantages = b_advantages[mb_inds]
-                    if args.norm_adv:
-                        mb_advantages = (mb_advantages - mb_advantages.mean()) / (
-                            mb_advantages.std() + 1e-8
-                        )
-
-                    # Policy loss
-                    pg_loss1 = -mb_advantages * ratio
-                    pg_loss2 = -mb_advantages * torch.clamp(
-                        ratio, 1 - args.clip_coef, 1 + args.clip_coef
-                    )
-                    pg_loss = torch.max(pg_loss1, pg_loss2).mean()
-
-                    # Value loss
-                    newvalue = newvalue.view(-1)
-                    if args.clip_vloss:
-                        v_loss_unclipped = (newvalue - b_returns[mb_inds]) ** 2
-                        v_clipped = b_values[mb_inds] + torch.clamp(
-                            newvalue - b_values[mb_inds],
-                            -args.clip_coef,
-                            args.clip_coef,
-                        )
-                        v_loss_clipped = (v_clipped - b_returns[mb_inds]) ** 2
-                        v_loss_max = torch.max(v_loss_unclipped, v_loss_clipped)
-                        v_loss = 0.5 * v_loss_max.mean()
-                    else:
-                        v_loss = 0.5 * ((newvalue - b_returns[mb_inds]) ** 2).mean()
-
-                    entropy_loss = entropy.mean()
-                    loss = (
-                        pg_loss - args.ent_coef * entropy_loss + v_loss * args.vf_coef
-                    )
-
-                    dist_autograd.backward(context_id, [loss])
-
-                    nn.utils.clip_grad_norm_(cnn_network.parameters(), args.max_grad_norm)
-                    optimizer.step(context_id)
+                )
+                
+                # Now perform backward pass on machine0 using received gradients
+                optimizer.zero_grad()
+                cnn_features.backward(feature_grads)
+                
+                # Clip gradients for CNN network
+                nn.utils.clip_grad_norm_(cnn_network.parameters(), args.max_grad_norm)
+                
+                # Optimizer step for CNN network
+                optimizer.step()
+                
+                # Store loss values for logging
+                pg_loss = torch.tensor(pg_loss_val)
+                v_loss = torch.tensor(v_loss_val)
+                entropy_loss = torch.tensor(entropy_loss_val)
 
             # if args.target_kl is not None and approx_kl > args.target_kl:
             #     break
