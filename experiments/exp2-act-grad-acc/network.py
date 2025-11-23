@@ -106,10 +106,13 @@ class ActorCriticNetwork(nn.Module):
             return self.critic(cnn_features)
     
     def backward_and_step(self, cnn_features, actions, old_logprobs, advantages, returns, old_values, 
-                          clip_coef, vf_coef, ent_coef, norm_adv, clip_vloss):
+                          clip_coef, vf_coef, ent_coef, norm_adv, clip_vloss, gradient_stats=False):
         """
         Perform forward pass, compute loss components, backward pass, and optimizer step.
         Returns gradients w.r.t. cnn_features to send back to machine0.
+        
+        Args:
+            gradient_stats: If True, returns mean and std of gradients (2, 4096) instead of full gradients (batch_size, 4096)
         """
         # Ensure features require gradients
         cnn_features = cnn_features.detach().requires_grad_(True)
@@ -155,6 +158,16 @@ class ActorCriticNetwork(nn.Module):
         # Extract gradients w.r.t. input features (to send back to machine0)
         feature_grads = cnn_features.grad.clone()
         
+        # Compute gradient statistics if requested
+        if gradient_stats:
+            # Compute mean and std across the batch dimension (dim=0)
+            grad_mean = feature_grads.mean(dim=0, keepdim=True)
+            grad_std = feature_grads.std(dim=0, keepdim=True)
+            feature_grads_stats = torch.cat([grad_mean, grad_std], dim=0)
+            feature_grads = None
+        else:
+            feature_grads_stats = None
+        
         # Clip gradients for actor-critic parameters
         nn.utils.clip_grad_norm_(self.parameters(), self.max_grad_norm)
         
@@ -162,4 +175,4 @@ class ActorCriticNetwork(nn.Module):
         self.optimizer.step()
         
         # Return gradients and loss components for logging
-        return feature_grads, pg_loss.item(), v_loss.item(), entropy_loss.item()
+        return feature_grads, feature_grads_stats, pg_loss.item(), v_loss.item(), entropy_loss.item()

@@ -23,7 +23,7 @@ class Args:
     torch_deterministic: bool = True
     cuda: bool = False
     env_id: str = "CarRacing-v3"
-    technique: str = "cloud-setup-manual"
+    technique: str = "gradient-stats"
 
     # Algorithm specific arguments
     total_timesteps: int = 500_000
@@ -43,6 +43,7 @@ class Args:
     max_grad_norm: float = 0.5
     target_kl: float | None = None
     save_model_freq: int | None = 10
+    warm_start_steps: int = 50_000
 
     # to be filled in runtime
     batch_size: int = 0
@@ -234,9 +235,12 @@ def main():
                 # Forward pass through CNN with gradients enabled
                 cnn_features = cnn_network(b_obs[mb_inds])
                 
+                # Determine whether to use gradient statistics based on warm start
+                use_gradient_stats = global_step >= args.warm_start_steps
+                
                 # Send features and loss components to machine1 for backward pass via RRef
                 # Machine1 will compute loss, backward, and return feature gradients
-                feature_grads, pg_loss_val, v_loss_val, entropy_loss_val = _remote_method(
+                feature_grads, feature_grads_stats, pg_loss_val, v_loss_val, entropy_loss_val = _remote_method(
                     ActorCriticNetwork.backward_and_step,
                     remote_actor_critic_network_rref,
                     cnn_features.detach(),
@@ -250,7 +254,18 @@ def main():
                     args.ent_coef,
                     args.norm_adv,
                     args.clip_vloss,
+                    gradient_stats=use_gradient_stats,
                 )
+
+                # If gradient stats are used, expand them to match minibatch size
+                if use_gradient_stats:
+                    # feature_grads_stats shape: (2, 4096) -> [mean, std]
+                    # Need to expand to: (minibatch_size, 4096)
+                    grad_mean = feature_grads_stats[0:1, :]
+                    grad_std = feature_grads_stats[1:2, :]
+                    
+                    minibatch_size = cnn_features.shape[0]
+                    feature_grads = torch.randn(minibatch_size, grad_mean.shape[1], device=device) * grad_std + grad_mean
                 
                 # Now perform backward pass on machine0 using received gradients
                 optimizer.zero_grad()
