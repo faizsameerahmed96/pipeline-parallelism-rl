@@ -48,7 +48,7 @@ class Args:
     max_grad_norm: float = 0.5
     target_kl: float | None = None
     save_model_freq: int | None = 10
-    warm_start_steps: int = 50_000
+    warm_start_steps: int = 30_000
     cnn_network_checkpoint_path: str | None = None
     agent_network_checkpoint_path: str | None = None
 
