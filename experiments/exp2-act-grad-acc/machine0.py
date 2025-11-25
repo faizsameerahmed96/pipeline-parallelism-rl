@@ -47,6 +47,8 @@ class Args:
     vf_coef: float = 0.5
     max_grad_norm: float = 0.5
     target_kl: float | None = None
+
+    # Model saving/loading args
     save_model_freq: int | None = 10
     cnn_network_checkpoint_path: str | None = None
     agent_network_checkpoint_path: str | None = None
