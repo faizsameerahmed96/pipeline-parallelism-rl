@@ -48,9 +48,12 @@ class Args:
     max_grad_norm: float = 0.5
     target_kl: float | None = None
     save_model_freq: int | None = 10
-    warm_start_steps: int = 30_000
     cnn_network_checkpoint_path: str | None = None
     agent_network_checkpoint_path: str | None = None
+
+    # Compression related args
+    gradient_compression_technique: str | None = None # 'stats'
+    warm_start_steps: int = 30_000 # Number of steps before starting compression
 
     # to be filled in runtime
     batch_size: int = 0
@@ -265,7 +268,7 @@ def main():
                 cnn_features = cnn_network(b_obs[mb_inds])
                 
                 # Determine whether to use gradient statistics based on warm start
-                use_gradient_stats = global_step >= args.warm_start_steps
+                use_gradient_stats = args.gradient_compression_technique == 'stats' and global_step >= args.warm_start_steps
                 
                 # Send features and loss components to machine1 for backward pass via RRef
                 # Machine1 will compute loss, backward, and return feature gradients
@@ -286,7 +289,6 @@ def main():
                     gradient_stats=use_gradient_stats,
                 )
 
-                # If gradient stats are used, expand them to match minibatch size
                 if use_gradient_stats:
                     # feature_grads_stats shape: (2, 4096) -> [mean, std]
                     # Need to expand to: (minibatch_size, 4096)
@@ -296,17 +298,14 @@ def main():
                     minibatch_size = cnn_features.shape[0]
                     feature_grads = torch.randn(minibatch_size, grad_mean.shape[1], device=device) * grad_std + grad_mean
                 
-                # Now perform backward pass on machine0 using received gradients
                 optimizer.zero_grad()
                 cnn_features.backward(feature_grads)
                 
-                # Clip gradients for CNN network
                 nn.utils.clip_grad_norm_(cnn_network.parameters(), args.max_grad_norm)
                 
                 # Optimizer step for CNN network
                 optimizer.step()
                 
-                # Store loss values for logging
                 pg_loss = torch.tensor(pg_loss_val)
                 v_loss = torch.tensor(v_loss_val)
                 entropy_loss = torch.tensor(entropy_loss_val)
