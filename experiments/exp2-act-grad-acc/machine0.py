@@ -137,13 +137,24 @@ def main():
             checkpoint_dir = f"/workspace/runs/{run_name}/models/"
             os.makedirs(checkpoint_dir, exist_ok=True)
 
-            checkpoint_path = f"{checkpoint_dir}iteration_{iteration}.pt"
+            # Save CNN network
+            cnn_checkpoint_path = f"{checkpoint_dir}cnn/"
+            os.makedirs(cnn_checkpoint_path, exist_ok=True)
+            checkpoint_path = f"{cnn_checkpoint_path}iteration_{iteration}.pt"
             torch.save({
                 'iteration': iteration,
                 'agent_state_dict': cnn_network.state_dict(),
                 'args': vars(args),
             }, checkpoint_path)
-            print(f"Model saved to {checkpoint_path}", flush=True)
+            print(f"CNN model saved to {checkpoint_path}", flush=True)
+            
+            # Save ActorCritic network remotely
+            _remote_method(
+                ActorCriticNetwork.save_model,
+                remote_actor_critic_network_rref,
+                checkpoint_dir,
+                iteration
+            )
 
         # Rollout
         for step in range(0, args.num_steps):

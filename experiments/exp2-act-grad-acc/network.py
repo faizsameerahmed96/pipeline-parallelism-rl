@@ -176,3 +176,20 @@ class ActorCriticNetwork(nn.Module):
         
         # Return gradients and loss components for logging
         return feature_grads, feature_grads_stats, pg_loss.item(), v_loss.item(), entropy_loss.item()
+    
+    def save_model(self, checkpoint_dir, iteration):
+        """Save the ActorCriticNetwork model checkpoint."""
+        import os
+        import torch
+        
+        save_path = f"{checkpoint_dir}actor_critic/"
+        os.makedirs(save_path, exist_ok=True)
+        
+        checkpoint_path = f"{save_path}iteration_{iteration}.pt"
+        torch.save({
+            'iteration': iteration,
+            'model_state_dict': self.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+        }, checkpoint_path)
+        
+        print(f"ActorCriticNetwork saved to {checkpoint_path}", flush=True)
