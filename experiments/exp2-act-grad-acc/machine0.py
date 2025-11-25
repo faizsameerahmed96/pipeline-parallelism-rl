@@ -1,6 +1,7 @@
 import os
 import time
 from dataclasses import dataclass
+import random
 
 import gymnasium as gym
 import numpy as np
@@ -16,11 +17,15 @@ from env import make_env
 from network import ActorCriticNetwork, CNNNetwork
 from torch.distributed.rpc import RRef
 
+# Enable deterministic behavior
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
+os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+
 
 @dataclass
 class Args:
     seed: int = 1
-    torch_deterministic: bool = True
     cuda: bool = False
     env_id: str = "CarRacing-v3"
     technique: str = "gradient-stats"
@@ -70,6 +75,13 @@ def main():
     args.batch_size = int(args.num_envs * args.num_steps)
     args.minibatch_size = int(args.batch_size // args.num_minibatches)
     args.num_iterations = args.total_timesteps // args.batch_size
+
+    # Set seeds for deterministic behavior
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    torch.cuda.manual_seed_all(args.seed)
+    torch.use_deterministic_algorithms(True)
 
     run_name = f"{int(time.time())}-{args.technique}"
     print(f"Run: {run_name}")

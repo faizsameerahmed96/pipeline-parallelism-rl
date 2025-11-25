@@ -56,8 +56,6 @@ class CNNNetwork(nn.Module):
     
     def load_model(self, checkpoint_path):
         """Load the CNNNetwork model checkpoint."""
-        import torch
-        
         checkpoint = torch.load(checkpoint_path)
         self.load_state_dict(checkpoint['model_state_dict'])
         print(f"CNNNetwork loaded from {checkpoint_path}", flush=True)
