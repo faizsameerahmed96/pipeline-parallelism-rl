@@ -44,6 +44,8 @@ class Args:
     target_kl: float | None = None
     save_model_freq: int | None = 10
     warm_start_steps: int = 50_000
+    cnn_network_checkpoint_path: str | None = None
+    agent_network_checkpoint_path: str | None = None
 
     # to be filled in runtime
     batch_size: int = 0
@@ -100,9 +102,21 @@ def main():
     )
 
     cnn_network = CNNNetwork(envs).to(device)
+    
+    # Load CNN checkpoint if provided
+    if args.cnn_network_checkpoint_path is not None:
+        cnn_network.load_model(args.cnn_network_checkpoint_path)
 
     remote_actor_critic_network_rref = rpc.remote("worker1", ActorCriticNetwork)
     print(f"Remote reference to worker1 obtained.", flush=True)
+    
+    # Load ActorCritic checkpoint if provided
+    if args.agent_network_checkpoint_path is not None:
+        _remote_method(
+            ActorCriticNetwork.load_model,
+            remote_actor_critic_network_rref,
+            args.agent_network_checkpoint_path
+        )
 
     # Create local optimizer for CNN network only
     optimizer = torch.optim.Adam(cnn_network.parameters(), lr=args.learning_rate)
@@ -138,15 +152,7 @@ def main():
             os.makedirs(checkpoint_dir, exist_ok=True)
 
             # Save CNN network
-            cnn_checkpoint_path = f"{checkpoint_dir}cnn/"
-            os.makedirs(cnn_checkpoint_path, exist_ok=True)
-            checkpoint_path = f"{cnn_checkpoint_path}iteration_{iteration}.pt"
-            torch.save({
-                'iteration': iteration,
-                'agent_state_dict': cnn_network.state_dict(),
-                'args': vars(args),
-            }, checkpoint_path)
-            print(f"CNN model saved to {checkpoint_path}", flush=True)
+            cnn_network.save_model(checkpoint_dir, iteration, args)
             
             # Save ActorCritic network remotely
             _remote_method(

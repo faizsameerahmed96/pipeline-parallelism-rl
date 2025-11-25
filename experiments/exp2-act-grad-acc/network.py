@@ -3,6 +3,8 @@ import numpy as np
 from torch.distributions.transformed_distribution import TransformedDistribution
 from torch.distributions.transforms import TanhTransform
 from torch.distributions.normal import Normal
+import os
+import torch
 import torch
 
 
@@ -35,6 +37,31 @@ class CNNNetwork(nn.Module):
     def forward(self, obs):
         features = self.cnn(obs)
         return features
+    
+    def save_model(self, checkpoint_dir, iteration, args=None):
+        """Save the CNNNetwork model checkpoint."""
+        save_path = f"{checkpoint_dir}cnn/"
+        os.makedirs(save_path, exist_ok=True)
+        
+        checkpoint_path = f"{save_path}iteration_{iteration}.pt"
+        checkpoint_data = {
+            'iteration': iteration,
+            'model_state_dict': self.state_dict(),
+        }
+        if args is not None:
+            checkpoint_data['args'] = vars(args)
+        
+        torch.save(checkpoint_data, checkpoint_path)
+        print(f"CNNNetwork saved to {checkpoint_path}", flush=True)
+    
+    def load_model(self, checkpoint_path):
+        """Load the CNNNetwork model checkpoint."""
+        import torch
+        
+        checkpoint = torch.load(checkpoint_path)
+        self.load_state_dict(checkpoint['model_state_dict'])
+        print(f"CNNNetwork loaded from {checkpoint_path}", flush=True)
+        return checkpoint.get('iteration', 0)
 
 
 class ActorCriticNetwork(nn.Module):
@@ -179,9 +206,6 @@ class ActorCriticNetwork(nn.Module):
     
     def save_model(self, checkpoint_dir, iteration):
         """Save the ActorCriticNetwork model checkpoint."""
-        import os
-        import torch
-        
         save_path = f"{checkpoint_dir}actor_critic/"
         os.makedirs(save_path, exist_ok=True)
         
@@ -193,3 +217,13 @@ class ActorCriticNetwork(nn.Module):
         }, checkpoint_path)
         
         print(f"ActorCriticNetwork saved to {checkpoint_path}", flush=True)
+    
+    def load_model(self, checkpoint_path):
+        """Load the ActorCriticNetwork model checkpoint."""
+        import torch
+        
+        checkpoint = torch.load(checkpoint_path)
+        self.load_state_dict(checkpoint['model_state_dict'])
+        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        print(f"ActorCriticNetwork loaded from {checkpoint_path}", flush=True)
+        return checkpoint.get('iteration', 0)
