@@ -15,7 +15,7 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
 
 
 class CNNNetwork(nn.Module):
-    def __init__(self, envs):
+    def __init__(self, envs, learning_rate=0.00005):
         super().__init__()
 
         n_input_channels = envs.single_observation_space.shape[0]
@@ -29,6 +29,9 @@ class CNNNetwork(nn.Module):
             nn.ReLU(),
             nn.Flatten(),
         )
+        
+        # Initialize optimizer for this network
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
 
         # with torch.no_grad():
         #     sample_input = torch.zeros(1, *envs.single_observation_space.shape)
@@ -47,6 +50,7 @@ class CNNNetwork(nn.Module):
         checkpoint_data = {
             'iteration': iteration,
             'model_state_dict': self.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
         }
         if args is not None:
             checkpoint_data['args'] = vars(args)
@@ -58,7 +62,10 @@ class CNNNetwork(nn.Module):
         """Load the CNNNetwork model checkpoint."""
         checkpoint = torch.load(checkpoint_path)
         self.load_state_dict(checkpoint['model_state_dict'])
-        print(f"CNNNetwork loaded from {checkpoint_path}", flush=True)
+        
+        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        print(f"CNNNetwork and optimizer loaded from {checkpoint_path}", flush=True)
+
         return checkpoint.get('iteration', 0)
 
 
@@ -217,7 +224,6 @@ class ActorCriticNetwork(nn.Module):
     
     def load_model(self, checkpoint_path):
         """Load the ActorCriticNetwork model checkpoint."""
-        import torch
         
         checkpoint = torch.load(checkpoint_path)
         self.load_state_dict(checkpoint['model_state_dict'])

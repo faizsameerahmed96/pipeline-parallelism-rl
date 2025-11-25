@@ -28,7 +28,6 @@ class Args:
     seed: int = 1
     cuda: bool = False
     env_id: str = "CarRacing-v3"
-    technique: str = "gradient-stats"
 
     # Algorithm specific arguments
     total_timesteps: int = 500_000
@@ -88,7 +87,7 @@ def main():
     torch.cuda.manual_seed_all(args.seed)
     torch.use_deterministic_algorithms(True)
 
-    run_name = f"{int(time.time())}-{args.technique}"
+    run_name = f"{int(time.time())}-grad-compression={args.gradient_compression_technique}"
     print(f"Run: {run_name}")
     
     # Initialize wandb only if API key is provided
@@ -118,7 +117,7 @@ def main():
         ]
     )
 
-    cnn_network = CNNNetwork(envs).to(device)
+    cnn_network = CNNNetwork(envs, learning_rate=args.learning_rate).to(device)
     
     # Load CNN checkpoint if provided
     if args.cnn_network_checkpoint_path is not None:
@@ -135,7 +134,7 @@ def main():
             args.agent_network_checkpoint_path
         )
 
-    optimizer = torch.optim.Adam(cnn_network.parameters(), lr=args.learning_rate)
+    optimizer = cnn_network.optimizer
 
     # store information from rollout
     obs = torch.zeros(
