@@ -135,7 +135,6 @@ def main():
             args.agent_network_checkpoint_path
         )
 
-    # Create local optimizer for CNN network only
     optimizer = torch.optim.Adam(cnn_network.parameters(), lr=args.learning_rate)
 
     # store information from rollout
