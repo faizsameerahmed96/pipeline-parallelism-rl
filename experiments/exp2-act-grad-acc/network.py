@@ -182,16 +182,15 @@ class ActorCriticNetwork(nn.Module):
         
         # Extract gradients w.r.t. input features (to send back to machine0)
         feature_grads = cnn_features.grad.clone()
+
+        feature_grads_stats = None
         
-        # Compute gradient statistics if requested
         if gradient_stats:
             # Compute mean and std across the batch dimension (dim=0)
             grad_mean = feature_grads.mean(dim=0, keepdim=True)
             grad_std = feature_grads.std(dim=0, keepdim=True)
             feature_grads_stats = torch.cat([grad_mean, grad_std], dim=0)
             feature_grads = None
-        else:
-            feature_grads_stats = None
         
         # Clip gradients for actor-critic parameters
         nn.utils.clip_grad_norm_(self.parameters(), self.max_grad_norm)
