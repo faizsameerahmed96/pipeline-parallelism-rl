@@ -49,8 +49,8 @@ class Args:
 
     # Model saving/loading args
     save_model_freq: int | None = 10
-    cnn_network_checkpoint_path: str | None = None
-    agent_network_checkpoint_path: str | None = None
+    cnn_network_checkpoint_path: str | None = '/workspace/runs/1764039438-grad-compression=None/models/cnn/iteration_70.pt'
+    agent_network_checkpoint_path: str | None = '/workspace/runs/1764039438-grad-compression=None/models/actor_critic/iteration_70.pt'
 
     # Compression related args
     gradient_compression_technique: str | None = None # 'stats'
@@ -119,20 +119,25 @@ def main():
 
     cnn_network = CNNNetwork(envs, learning_rate=args.learning_rate).to(device)
     
-    # Load CNN checkpoint if provided
+    # Load CNN checkpoint if provided and track starting iteration
+    start_iteration = 0
     if args.cnn_network_checkpoint_path is not None:
-        cnn_network.load_model(args.cnn_network_checkpoint_path)
+        start_iteration = cnn_network.load_model(args.cnn_network_checkpoint_path)
+        print(f"Resuming from iteration {start_iteration}", flush=True)
 
     remote_actor_critic_network_rref = rpc.remote("worker1", ActorCriticNetwork)
     print(f"Remote reference to worker1 obtained.", flush=True)
     
     # Load ActorCritic checkpoint if provided
     if args.agent_network_checkpoint_path is not None:
-        _remote_method(
+        loaded_iteration = _remote_method(
             ActorCriticNetwork.load_model,
             remote_actor_critic_network_rref,
             args.agent_network_checkpoint_path
         )
+        # Verify both checkpoints are from the same iteration
+        if start_iteration != loaded_iteration:
+            raise Exception("CNN and ActorCritic checkpoints are from different iterations!")
 
     optimizer = cnn_network.optimizer
 
@@ -148,7 +153,7 @@ def main():
     dones = torch.zeros((args.num_steps, args.num_envs)).to(device)
     values = torch.zeros((args.num_steps, args.num_envs)).to(device)
 
-    global_step = 0
+    global_step = (start_iteration - 1) * args.batch_size  # Resume global step count
     start_time = time.time()
     next_obs, _ = envs.reset(seed=args.seed)
     next_obs = torch.Tensor(next_obs).to(device)
@@ -158,7 +163,8 @@ def main():
     net_io_start = psutil.net_io_counters()
     bytes_start = net_io_start.bytes_sent + net_io_start.bytes_recv
 
-    for iteration in range(1, args.num_iterations + 1):
+    # Resume training from the checkpoint iteration
+    for iteration in range(start_iteration, args.num_iterations + 1):
         print(f"Iteration {iteration}/{args.num_iterations}", flush=True)
 
         # Save model checkpoint if save_model_freq is specified
