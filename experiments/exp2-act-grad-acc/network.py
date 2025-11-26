@@ -93,6 +93,9 @@ class ActorCriticNetwork(nn.Module):
         # Initialize optimizer for this network
         self.optimizer = torch.optim.Adam(self.parameters(), lr=1e-5)
         self.max_grad_norm = 0.5
+        
+        # Initialize global feature gradient accumulator
+        self.global_feature_grads = None
 
         # with torch.no_grad():
         #     sample_input = torch.zeros(1, *envs.single_observation_space.shape)
@@ -138,7 +141,7 @@ class ActorCriticNetwork(nn.Module):
             return self.critic(cnn_features)
     
     def backward_and_step(self, cnn_features, actions, old_logprobs, advantages, returns, old_values, 
-                          clip_coef, vf_coef, ent_coef, norm_adv, clip_vloss, gradient_stats=False):
+                          clip_coef, vf_coef, ent_coef, norm_adv, clip_vloss, gradient_stats=False, accumulated_grads=False):
         """
         Perform forward pass, compute loss components, backward pass, and optimizer step.
         Returns gradients w.r.t. cnn_features to send back to machine0.
@@ -191,8 +194,16 @@ class ActorCriticNetwork(nn.Module):
         feature_grads = cnn_features.grad.clone()
 
         feature_grads_stats = None
+        relevant_grads_from_global_feature_grads = None # This will only contain the grads that are only over a certain percentile
         
-        if gradient_stats:
+        if accumulated_grads:
+            # Accumulate gradients
+            if self.global_feature_grads is None:
+                self.global_feature_grads = torch.zeros_like(feature_grads)
+            self.global_feature_grads = self.global_feature_grads + feature_grads
+
+
+        elif gradient_stats:
             # Compute mean and std across the batch dimension (dim=0)
             grad_mean = feature_grads.mean(dim=0, keepdim=True)
             grad_std = feature_grads.std(dim=0, keepdim=True)
