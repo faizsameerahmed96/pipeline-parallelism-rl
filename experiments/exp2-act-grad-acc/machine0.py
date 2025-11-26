@@ -295,6 +295,26 @@ def main():
                     gradient_stats=use_gradient_stats,
                 )
 
+                # Analyze feature_grads percentiles
+                # if feature_grads is not None:
+                #     grads_flat = feature_grads.abs().flatten()
+                #     p25 = torch.quantile(grads_flat, 0.25).item()
+                #     p50 = torch.quantile(grads_flat, 0.50).item()
+                #     p75 = torch.quantile(grads_flat, 0.75).item()
+                #     p90 = torch.quantile(grads_flat, 0.90).item()
+                #     p99 = torch.quantile(grads_flat, 0.99).item()
+                    
+                #     # Log to terminal
+                #     print(f"Feature Grads Percentiles - 25th: {p25:.6f}, 50th: {p50:.6f}, 75th: {p75:.6f}, 90th: {p90:.6f}, 99th: {p99:.6f}", flush=True)
+                    
+                #     # Log to TensorBoard/wandb for visualization over time
+                #     writer.add_scalar("gradients/p25_abs", p25, global_step)
+                #     writer.add_scalar("gradients/p50_abs", p50, global_step)
+                #     writer.add_scalar("gradients/p75_abs", p75, global_step)
+                #     writer.add_scalar("gradients/p90_abs", p90, global_step)
+                #     writer.add_scalar("gradients/p99_abs", p99, global_step)
+                
+
                 if use_gradient_stats:
                     # feature_grads_stats shape: (2, 4096) -> [mean, std]
                     # Need to expand to: (minibatch_size, 4096)
