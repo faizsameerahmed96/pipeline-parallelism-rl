@@ -201,7 +201,31 @@ class ActorCriticNetwork(nn.Module):
             if self.global_feature_grads is None:
                 self.global_feature_grads = torch.zeros_like(feature_grads)
             self.global_feature_grads = self.global_feature_grads + feature_grads
+            
+            # Find 90th percentile of absolute gradient values from accumulated gradients
+            abs_grads = torch.abs(self.global_feature_grads)
+            percentile_90 = torch.quantile(abs_grads, 0.9)
+            
+            # Create mask for values above 90th percentile
+            mask = abs_grads >= percentile_90
+            
+            # Get indices where mask is True
+            indices = torch.nonzero(mask, as_tuple=False)  # Shape: (num_above_threshold, 2)
+            
+            # Get the gradient values at those indices
+            values = self.global_feature_grads[mask]  # Shape: (num_above_threshold,)
+            
+            # Format: [num_elements, indices (row, col pairs), values]
+            relevant_grads_from_global_feature_grads = {
+                'indices': indices.short(),  # Convert to int16 to save space
+                'values': values,
+                'shape': feature_grads.shape
+            }
+            
+            # Zero out the selected gradients from global accumulator
+            self.global_feature_grads[mask] = 0
 
+            feature_grads = None
 
         elif gradient_stats:
             # Compute mean and std across the batch dimension (dim=0)
@@ -217,7 +241,7 @@ class ActorCriticNetwork(nn.Module):
         self.optimizer.step()
         
         # Return gradients and loss components for logging
-        return feature_grads, feature_grads_stats, pg_loss.item(), v_loss.item(), entropy_loss.item()
+        return feature_grads, feature_grads_stats, relevant_grads_from_global_feature_grads, pg_loss.item(), v_loss.item(), entropy_loss.item()
     
     def save_model(self, checkpoint_dir, iteration):
         """Save the ActorCriticNetwork model checkpoint."""

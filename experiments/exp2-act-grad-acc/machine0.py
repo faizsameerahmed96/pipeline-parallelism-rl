@@ -49,8 +49,8 @@ class Args:
 
     # Model saving/loading args
     save_model_freq: int | None = 10
-    cnn_network_checkpoint_path: str | None = '/workspace/runs/1764039438-grad-compression=None/models/cnn/iteration_70.pt'
-    agent_network_checkpoint_path: str | None = '/workspace/runs/1764039438-grad-compression=None/models/actor_critic/iteration_70.pt'
+    cnn_network_checkpoint_path: str | None = '/workspace/runs/1764039438-grad-compression=None/models/cnn/iteration_30.pt'
+    agent_network_checkpoint_path: str | None = '/workspace/runs/1764039438-grad-compression=None/models/actor_critic/iteration_30.pt'
 
     # Compression related args
     gradient_compression_technique: str | None = None # 'stats'
@@ -278,7 +278,7 @@ def main():
                 
                 # Send features and loss components to machine1 for backward pass via RRef
                 # Machine1 will compute loss, backward, and return feature gradients
-                feature_grads, feature_grads_stats, pg_loss_val, v_loss_val, entropy_loss_val = _remote_method(
+                feature_grads, feature_grads_stats, relevant_grads_from_global_feature_grads, pg_loss_val, v_loss_val, entropy_loss_val = _remote_method(
                     ActorCriticNetwork.backward_and_step,
                     remote_actor_critic_network_rref,
                     cnn_features.detach(),
@@ -293,6 +293,7 @@ def main():
                     args.norm_adv,
                     args.clip_vloss,
                     gradient_stats=use_gradient_stats,
+                    accumulated_grads=True
                 )
 
                 # Analyze feature_grads percentiles
@@ -324,6 +325,21 @@ def main():
                     minibatch_size = cnn_features.shape[0]
                     feature_grads = torch.randn(minibatch_size, grad_mean.shape[1], device=device) * grad_std + grad_mean
                 
+                # Reconstruct sparse gradients if accumulated_grads was used
+                if relevant_grads_from_global_feature_grads is not None:
+                    # Extract sparse gradient data
+                    indices = relevant_grads_from_global_feature_grads['indices'].long()  # (num_elements, 2)
+                    values = relevant_grads_from_global_feature_grads['values']    # (num_elements,)
+                    shape = relevant_grads_from_global_feature_grads['shape']      # Original shape
+                    
+                    # Create zero tensor with original shape
+                    feature_grads = torch.zeros(shape, device=device)
+                    
+                    # Fill in the sparse values at their corresponding indices
+                    # indices[:, 0] are row indices, indices[:, 1] are column indices
+                    feature_grads[indices[:, 0], indices[:, 1]] = values
+
+                
                 optimizer.zero_grad()
                 cnn_features.backward(feature_grads)
                 
@@ -346,12 +362,12 @@ def main():
 
         y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
         var_y = np.var(y_true)
-        explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
+        # explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
 
         time_elapsed = time.time() - start_time
         print(f"Time elapsed: {time_elapsed:.2f}s", flush=True)
         writer.add_scalar("charts/time_elapsed", time_elapsed, iteration)
-        writer.add_scalar("losses/explained_variance", explained_var, global_step)
+        # writer.add_scalar("losses/explained_variance", explained_var, global_step)
         writer.add_scalar("charts/learning_rate", args.learning_rate, global_step)
         sps = int(global_step / time_elapsed)
         print(f"SPS: {sps}")
