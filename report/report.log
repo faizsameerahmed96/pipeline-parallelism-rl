@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2024) (preloaded format=pdflatex 2024.10.1)  13 DEC 2025 13:43
+This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2024) (preloaded format=pdflatex 2024.10.1)  13 DEC 2025 14:03
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -233,8 +233,7 @@ Package xcolor Info: Model `wave' substituted by `hsb' on input line 1373.
 File: l3backend-pdftex.def 2024-02-20 L3 backend support: PDF output (pdfTeX)
 \l__color_backend_stack_int=\count285
 \l__pdf_internal_box=\box55
-)
-No file report.aux.
+) (./report.aux)
 \openout1 = `report.aux'.
 
 LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 12.
@@ -251,6 +250,7 @@ LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 12.
 LaTeX Font Info:    ... okay on input line 12.
 LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 12.
 LaTeX Font Info:    ... okay on input line 12.
+
 -- Lines per column: 56 (exact).
 (/usr/local/texlive/2024/texmf-dist/tex/context/base/mkii/supp-pdf.mkii
 [Loading MPS to PDF converter (version 2006.09.02).]
@@ -270,59 +270,18 @@ Package: epstopdf-base 2020-01-24 v2.11 Base part for package epstopdf
 Package epstopdf-base Info: Redefining graphics rule for `.eps' on input line 485.
  (/usr/local/texlive/2024/texmf-dist/tex/latex/latexconfig/epstopdf-sys.cfg
 File: epstopdf-sys.cfg 2010/07/13 v1.3 Configuration of (r)epstopdf for TeX Live
-))
-
-LaTeX Warning: Citation `nair2015' on page 1 undefined on input line 52.
-
-
-LaTeX Warning: Citation `impala2018' on page 1 undefined on input line 52.
-
-
-LaTeX Warning: Citation `apex2018' on page 1 undefined on input line 52.
-
-
-LaTeX Warning: Citation `chen2018' on page 1 undefined on input line 56.
-
-
-LaTeX Warning: Citation `dgc2018' on page 1 undefined on input line 56.
-
-
-LaTeX Warning: Citation `qsgd2017' on page 1 undefined on input line 56.
-
-
-LaTeX Warning: Citation `gpipe2019' on page 1 undefined on input line 60.
-
-
-LaTeX Warning: Citation `pipedream2019' on page 1 undefined on input line 60.
-
-
-LaTeX Warning: Citation `megatron2019' on page 1 undefined on input line 60.
-
-
-LaTeX Warning: Citation `zero2020' on page 1 undefined on input line 60.
-
-[1{/usr/local/texlive/2024/texmf-var/fonts/map/pdftex/updmap/pdftex.map}{/usr/local/texlive/2024/texmf-dist/fonts/enc/dvips/base/8r.enc}
+)) [1{/usr/local/texlive/2024/texmf-var/fonts/map/pdftex/updmap/pdftex.map}{/usr/local/texlive/2024/texmf-dist/fonts/enc/dvips/base/8r.enc}
 
 
 ]
-
-LaTeX Warning: Citation `lim2020' on page 2 undefined on input line 64.
-
-
-LaTeX Warning: Citation `feng2023' on page 2 undefined on input line 64.
-
 LaTeX Font Info:    Trying to load font information for U+msa on input line 74.
-(/usr/local/texlive/2024/texmf-dist/tex/latex/amsfonts/umsa.fd
+ (/usr/local/texlive/2024/texmf-dist/tex/latex/amsfonts/umsa.fd
 File: umsa.fd 2013/01/14 v3.01 AMS symbols A
 )
 LaTeX Font Info:    Trying to load font information for U+msb on input line 74.
  (/usr/local/texlive/2024/texmf-dist/tex/latex/amsfonts/umsb.fd
 File: umsb.fd 2013/01/14 v3.01 AMS symbols B
 )
-
-LaTeX Warning: Reference `tab:data_transfer' on page 2 undefined on input line 86.
-
-
 Underfull \hbox (badness 10000) in paragraph at lines 111--112
 []\OT1/ptm/m/n/10 To sim-u-late pipeline par-al-lelism across bandwidth-
  []
@@ -334,77 +293,6 @@ Underfull \hbox (badness 3148) in paragraph at lines 111--112
 
 [2]
 
-LaTeX Warning: Citation `dgc2018' on page 3 undefined on input line 125.
-
-
-LaTeX Warning: Reference `eq' on page 3 undefined on input line 172.
-
-
-LaTeX Warning: Reference `eq' on page 3 undefined on input line 172.
-
-
-LaTeX Warning: Reference `eq' on page 3 undefined on input line 172.
-
-
-LaTeX Warning: Reference `eq' on page 3 undefined on input line 173.
-
-LaTeX Font Info:    Trying to load font information for OT1+pcr on input line 177.
-(/usr/local/texlive/2024/texmf-dist/tex/latex/psnfss/ot1pcr.fd
-File: ot1pcr.fd 2001/06/04 font definitions for OT1/pcr.
-) [3]
-
-LaTeX Warning: Citation `b7' on page 4 undefined on input line 226.
-
-
-LaTeX Warning: Reference `fig' on page 4 undefined on input line 262.
-
-
-LaTeX Warning: File `fig1.png' not found on input line 282.
-
-
-/Users/faizahmed/Documents/SJSU/CS297/pipeline-parallelism-rl/report/report.tex:282: Package pdftex.def Error: File `fig1.png' not found: using draft setting.
-
-See the pdftex.def package documentation for explanation.
-Type  H <return>  for immediate help.
- ...                                              
-                                                  
-l.282 \centerline{\includegraphics{fig1.png}}
-                                             
-Try typing  <return>  to proceed.
-If that doesn't work, type  X <return>  to quit.
-
-LaTeX Font Info:    Trying to load font information for OMS+ptm on input line 293.
-(/usr/local/texlive/2024/texmf-dist/tex/latex/psnfss/omsptm.fd
-File: omsptm.fd 
-)
-LaTeX Font Info:    Font shape `OMS/ptm/m/n' in size <10> not available
-(Font)              Font shape `OMS/cmsy/m/n' tried instead on input line 293.
- [4]
-
-LaTeX Warning: Citation `b1' on page 5 undefined on input line 306.
-
-
-LaTeX Warning: Citation `b2' on page 5 undefined on input line 307.
-
-
-LaTeX Warning: Citation `b3' on page 5 undefined on input line 308.
-
-
-LaTeX Warning: Citation `b3' on page 5 undefined on input line 308.
-
-
-LaTeX Warning: Citation `b3' on page 5 undefined on input line 308.
-
-
-LaTeX Warning: Citation `b3' on page 5 undefined on input line 309.
-
-
-LaTeX Warning: Citation `b4' on page 5 undefined on input line 317.
-
-
-LaTeX Warning: Citation `b5' on page 5 undefined on input line 318.
-
-
 ** Conference Paper **
 Before submitting the final camera ready copy, remember to:
 
@@ -415,32 +303,25 @@ Before submitting the final camera ready copy, remember to:
  uses only Type 1 fonts and that every step in the generation
  process uses the appropriate paper size.
 
-[5] (./report.aux)
+[3] (./report.aux)
  ***********
 LaTeX2e <2023-11-01> patch level 1
 L3 programming layer <2024-02-20>
  ***********
-
-
-LaTeX Warning: There were undefined references.
-
-
-LaTeX Warning: Label(s) may have changed. Rerun to get cross-references right.
-
  ) 
 Here is how much of TeX's memory you used:
- 4296 strings out of 474116
- 67329 string characters out of 5743682
- 1945187 words of memory out of 5000000
- 26605 multiletter control sequences out of 15000+600000
- 602682 words of font info for 119 fonts, out of 8000000 for 9000
+ 4189 strings out of 474116
+ 65678 string characters out of 5743682
+ 1946187 words of memory out of 5000000
+ 26509 multiletter control sequences out of 15000+600000
+ 598236 words of font info for 112 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 57i,11n,65p,1242b,304s stack positions out of 10000i,1000n,20000p,200000b,200000s
-</usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx7.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi5.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr6.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/urw/courier/ucrr8a.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/urw/times/utmb8a.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/urw/times/utmbi8a.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/urw/times/utmri8a.pfb>
-Output written on report.pdf (5 pages, 207376 bytes).
+ 57i,9n,65p,1242b,276s stack positions out of 10000i,1000n,20000p,200000b,200000s
+</usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx7.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi5.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/urw/times/utmb8a.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/urw/times/utmbi8a.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></usr/local/texlive/2024/texmf-dist/fonts/type1/urw/times/utmri8a.pfb>
+Output written on report.pdf (3 pages, 175189 bytes).
 PDF statistics:
- 111 PDF objects out of 1000 (max. 8388607)
- 67 compressed objects within 1 object stream
+ 95 PDF objects out of 1000 (max. 8388607)
+ 57 compressed objects within 1 object stream
  0 named destinations out of 1000 (max. 500000)
  1 words of extra memory for PDF output out of 10000 (max. 10000000)
 
