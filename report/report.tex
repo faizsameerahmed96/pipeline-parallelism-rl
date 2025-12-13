@@ -102,6 +102,60 @@ Pipeline-Parallel & 66 GB & 2.4$\times$ \\
 
 This overhead stems from repeated gradient exchanges during multiple training epochs. Our goal is to reduce backward gradient communication while maintaining training performance, making pipeline parallelism viable for bandwidth-constrained environments.
 
+\section{Method}
+
+\subsection{Experimental Setup}
+
+We train a reinforcement learning agent on the CarRacing-v3 environment from OpenAI Gym, where the goal is to control a car around a racing track by outputting continuous steering, acceleration, and braking actions. Each observation is a $4 \times 96 \times 96$ RGB image stack representing four consecutive frames. The agent employs Proximal Policy Optimization (PPO) with a total training budget of 500,000 timesteps across 100 iterations, where each iteration consists of 4,096 environment steps followed by 10 update epochs with 32 minibatches of size 128.
+
+To simulate pipeline parallelism across bandwidth-constrained devices, we deploy our system using Docker Compose with two containers connected via a bridge network. Machine 0 hosts the environment and CNN feature extractor, while Machine 1 hosts the actor-critic network. Communication between machines uses PyTorch's distributed RPC framework, which transmits tensors over the network and provides a realistic simulation of inter-device bandwidth limitations.
+
+\subsection{Network Architecture and Partitioning}
+
+The agent network consists of two components distributed across machines:
+
+\textbf{CNN Feature Extractor (Machine 0):} Processes raw observations through three convolutional layers: Conv2d(4$\rightarrow$32, kernel=8, stride=4), Conv2d(32$\rightarrow$64, kernel=4, stride=2), and Conv2d(64$\rightarrow$64, kernel=3, stride=1), each followed by ReLU activation. The output is flattened to a 4,096-dimensional feature vector. This compression from $4 \times 96 \times 96 = 36,864$ input dimensions to 4,096 features provides an 9$\times$ reduction, significantly lowering communication overhead during policy rollout compared to transmitting raw observations.
+
+\textbf{Actor-Critic Network (Machine 1):} Takes the 4,096-dimensional features as input. The actor head produces a 3-dimensional continuous action (steering, acceleration, brake) through a two-layer MLP (4096$\rightarrow$512$\rightarrow$3) with Gaussian policy parameterization and tanh squashing. The critic head estimates state values through a parallel MLP (4096$\rightarrow$512$\rightarrow$1). Both networks use orthogonal weight initialization for stable training.
+
+During policy rollout, Machine 0 sends 4,096-dimensional feature vectors to Machine 1 for action selection—a 9$\times$ bandwidth savings compared to sending raw $4 \times 96 \times 96$ observations. However, the training phase requires bidirectional communication: forward activations and backward gradients must be exchanged for each minibatch across 10 epochs, creating the 66 GB overhead identified in Section III.
+
+\subsection{Gradient Accumulation with Percentile-Based Sparsification}
+
+To reduce backward gradient communication, we introduce a selective gradient transmission strategy inspired by Deep Gradient Compression \cite{dgc2018}. Rather than transmitting full gradient tensors from Machine 1 to Machine 0 after each minibatch, we accumulate gradients locally on Machine 1 and transmit only the most significant values.
+
+\textbf{Accumulation Phase:} Machine 1 maintains a global gradient accumulator $\mathbf{G} \in \mathbb{R}^{b \times d}$ initialized to zero, where $b$ is the minibatch size (128) and $d$ is the feature dimension (4,096). After computing the backward pass for minibatch $i$, we accumulate the feature gradients:
+\begin{equation}
+\mathbf{G} \leftarrow \mathbf{G} + \nabla_{\mathbf{f}_i} \mathcal{L}
+\end{equation}
+where $\nabla_{\mathbf{f}_i} \mathcal{L}$ represents gradients with respect to CNN features for minibatch $i$.
+
+\textbf{Sparsification and Transmission:} After accumulation, we compute the $p$-th percentile threshold on absolute gradient magnitudes:
+\begin{equation}
+\tau = \text{quantile}(|\mathbf{G}|, p)
+\end{equation}
+where $p \in [0.90, 0.99]$ is a configurable hyperparameter. We create a binary mask $\mathbf{M}$ and transmit only gradients exceeding the threshold:
+\begin{equation}
+\mathbf{M}_{ij} = \begin{cases}
+1 & \text{if } |\mathbf{G}_{ij}| \geq \tau \\
+0 & \text{otherwise}
+\end{cases}
+\end{equation}
+
+The sparse gradient representation consists of three components: (1) indices of non-zero elements stored as int16 coordinates, (2) corresponding gradient values in bfloat16, and (3) tensor shape metadata. For a 90th percentile threshold, we transmit only 10\% of gradient values, achieving a theoretical 10$\times$ compression. After transmission, selected gradients are zeroed in the accumulator:
+\begin{equation}
+\mathbf{G}_{ij} \leftarrow \begin{cases}
+0 & \text{if } \mathbf{M}_{ij} = 1 \\
+\mathbf{G}_{ij} & \text{otherwise}
+\end{cases}
+\end{equation}
+
+\textbf{Reconstruction on Machine 0:} Machine 0 reconstructs the sparse gradient tensor from received indices and values, then applies it to update CNN parameters through standard backpropagation with gradient clipping (max norm 0.5) and Adam optimization (learning rate $5 \times 10^{-5}$).
+
+\textbf{Warm Start:} To ensure stable initial training, we apply full gradient communication for the first 30,000 timesteps before enabling gradient accumulation. This allows the network to establish reasonable initial weights before introducing compression.
+
+The key advantage of this approach for RL is that repeated training epochs naturally generate multiple gradient signals for similar data, making accumulation particularly effective. By deferring transmission until gradients become statistically significant, we reduce communication while preserving the most informative updates for the feature extractor.
+
 \subsection{Equations}
 Number equations consecutively. To make your 
 equations more compact, you may use the solidus (~/~), the exp function, or 
