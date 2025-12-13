@@ -65,29 +65,42 @@ Recent work addresses distributed learning in resource-constrained settings. Lim
 
 Our work differs from prior approaches by specifically addressing the communication bottleneck in pipeline-parallel RL training through selective gradient accumulation. While existing gradient compression techniques focus on compressing all gradients uniformly or through quantization, our approach accumulates gradients over time and transmits only high-magnitude values above configurable percentile thresholds, tailored to the unique characteristics of RL training with repeated epochs.
 
-\section{Prepare Your Paper Before Styling}
-Before you begin to format your paper, first write and save the content as a 
-separate text file. Complete all content and organizational editing before 
-formatting. Please note sections \ref{AA}--\ref{SCM} below for more information on 
-proofreading, spelling and grammar.
+\section{Problem Statement}
 
-Keep your text and graphic files separate until after the text has been 
-formatted and styled. Do not number text heads---{\LaTeX} will do that 
-for you.
+We consider a distributed RL setup where an agent learns to control the CarRacing-v3 environment through interaction. The agent consists of a convolutional neural network (CNN) for feature extraction and an actor-critic network for policy and value estimation. Given resource constraints, we partition this agent across two machines: Machine 0 hosts the CNN and environment interaction, while Machine 1 hosts the actor-critic network.
 
-\subsection{Abbreviations and Acronyms}\label{AA}
-Define abbreviations and acronyms the first time they are used in the text, 
-even after they have been defined in the abstract. Abbreviations such as 
-IEEE, SI, MKS, CGS, ac, dc, and rms do not have to be defined. Do not use 
-abbreviations in the title or heads unless they are unavoidable.
+\subsection{Communication Overhead Analysis}
 
-\subsection{Units}
-\begin{itemize}
-\item Use either SI (MKS) or CGS as primary units. (SI units are encouraged.) English units may be used as secondary units (in parentheses). An exception would be the use of English units as identifiers in trade, such as ``3.5-inch disk drive''.
-\item Avoid combining SI and CGS units, such as current in amperes and magnetic field in oersteds. This often leads to confusion because equations do not balance dimensionally. If you must use mixed units, clearly state the units for each quantity that you use in an equation.
-\item Do not mix complete spellings and abbreviations of units: ``Wb/m\textsuperscript{2}'' or ``webers per square meter'', not ``webers/m\textsuperscript{2}''. Spell out units when they appear in text: ``. . . a few henries'', not ``. . . a few H''.
-\item Use a zero before decimal points: ``0.25'', not ``.25''. Use ``cm\textsuperscript{3}'', not ``cc''.)
-\end{itemize}
+We compare data transfer requirements across two deployment scenarios over 100 training iterations with batch size 4096 (100 iterations $\times$ 4096 steps per iteration).
+
+\textbf{Cloud Setup:} The local machine transmits raw observations to the cloud for complete training. Each observation is a $4 \times 96 \times 96$ tensor. Total data transfer:
+\begin{equation}
+100 \times 4096 \times (4 \times 96 \times 96) = 14.7\text{B tensors} \approx 28\text{ GB}
+\end{equation}
+
+\textbf{Pipeline-Parallel Setup:} The CNN runs locally, transmitting activations to Machine 1 and receiving gradients. With 10 update epochs per batch and 32 minibatches per epoch (minibatch size 128), we transmit 4096-dimensional activation and gradient vectors. Total data transfer:
+\begin{equation}
+100 \times 10 \times 32 \times 128 \times 4096 \times 2 = 32.7\text{B tensors} \approx 66\text{ GB}
+\end{equation}
+
+The factor of 2 accounts for bidirectional communication (forward activations and backward gradients). While cloud setup requires 28 GB, pipeline parallelism requires 66 GB—a 2.4$\times$ increase. Table \ref{tab:data_transfer} summarizes this comparison.
+
+\begin{table}[htbp]
+\caption{Communication Overhead Comparison}
+\begin{center}
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Setup} & \textbf{Data Transferred} & \textbf{Relative Cost} \\
+\hline
+Cloud Setup & 28 GB & 1.0$\times$ \\
+Pipeline-Parallel & 66 GB & 2.4$\times$ \\
+\hline
+\end{tabular}
+\label{tab:data_transfer}
+\end{center}
+\end{table}
+
+This overhead stems from repeated gradient exchanges during multiple training epochs. Our goal is to reduce backward gradient communication while maintaining training performance, making pipeline parallelism viable for bandwidth-constrained environments.
 
 \subsection{Equations}
 Number equations consecutively. To make your 
