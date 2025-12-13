@@ -178,6 +178,18 @@ Figure \ref{fig:network} presents cumulative data transfer throughout training. 
 
 Our results demonstrate that percentile-based gradient accumulation effectively reduces communication overhead in pipeline-parallel RL training. The 90th percentile threshold provides a practical operating point where bandwidth savings justify the moderate performance trade-off. Unlike supervised learning where gradients exhibit higher redundancy, RL gradients carry environment-specific signals that are more sensitive to lossy compression, suggesting future work on adaptive thresholds that adjust based on training progress.
 
+\section{Future Work (CS298 Plan)}
+
+While this work focused on reducing backward gradient communication, several promising directions remain for further investigation in CS298.
+
+\textbf{Forward Activation Compression:} Our current approach compresses only backward gradients, yet forward activations contribute equally to communication overhead. Applying similar percentile-based sparsification to the 4,096-dimensional feature vectors transmitted during policy rollout could yield additional bandwidth savings. However, unlike gradients which can be accumulated over multiple minibatches, forward activations must be transmitted immediately for action selection, presenting unique challenges for sparsification strategies that maintain policy quality.
+
+\textbf{Autoencoder-Based Compression:} Lightweight autoencoders could learn compressed representations of activations and gradients. Machine 1 would train an encoder compressing feature vectors or gradients into lower-dimensional latent codes, transmitting only these codes and a decoder to Machine 0. This could achieve superior compression ratios while better preserving information about complex gradient distributions.
+
+\textbf{Asynchronous Training:} Our current synchronous pipeline requires Machine 0 to wait for gradient updates from Machine 1 before proceeding to the next minibatch. Implementing asynchronous training—where Machine 0 continues forward passes while Machine 1 processes gradients from previous batches—could improve training throughput and better utilize both machines. This would require careful handling of gradient staleness and parameter versioning, potentially drawing inspiration from IMPALA's importance sampling corrections to maintain training stability despite asynchronous updates.
+
+These extensions would provide a comprehensive framework for communication-efficient pipeline-parallel RL training, addressing both forward and backward data transfer while exploring alternative compression paradigms and training synchronization strategies.
+
 \begin{thebibliography}{00}
 \bibitem{nair2015} A. Nair, P. Srinivasan, S. Blackwell, C. Alcicek, R. Fearon, A. De Maria, V. Panneershelvam, M. Suleyman, C. Beattie, S. Petersen, et al., ``Massively parallel methods for deep reinforcement learning,'' in \textit{ICML Deep Learning Workshop}, 2015.
 
