@@ -1,6 +1,6 @@
 # Fdb version 4
-["pdflatex"] 1765663416.39651 "/Users/faizahmed/Documents/SJSU/CS297/pipeline-parallelism-rl/report/report.tex" "report.pdf" "report" 1765663416.84592 0
-  "/Users/faizahmed/Documents/SJSU/CS297/pipeline-parallelism-rl/report/report.tex" 1765663415.83252 18638 dd5697b5b66b488de660d45be7be6d8b ""
+["pdflatex"] 1765666175.48765 "/Users/faizahmed/Documents/SJSU/CS297/pipeline-parallelism-rl/report/report.tex" "report.pdf" "report" 1765666175.93989 0
+  "/Users/faizahmed/Documents/SJSU/CS297/pipeline-parallelism-rl/report/report.tex" 1765666174.87375 21591 e83d43c0b0a1c157ae7d4030c86dabd3 ""
   "/usr/local/texlive/2024/texmf-dist/fonts/enc/dvips/base/8r.enc" 1165713224 4850 80dc9bab7f31fb78a000ccfed0e27cab ""
   "/usr/local/texlive/2024/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "/usr/local/texlive/2024/texmf-dist/fonts/tfm/adobe/times/ptmb7t.tfm" 1136768653 2172 fd0c924230362ff848a33632ed45dc23 ""
@@ -82,8 +82,10 @@
   "/usr/local/texlive/2024/texmf-var/fonts/map/pdftex/updmap/pdftex.map" 1727768635.67795 5467645 128b85b7cde5f5edc5cb7f1dd7ff8736 ""
   "/usr/local/texlive/2024/texmf-var/web2c/pdftex/pdflatex.fmt" 1727768611 8221412 04c89ba4e1f6a9ec48d798131f3412a9 ""
   "/usr/local/texlive/2024/texmf.cnf" 1710266656 577 e590dabc9e28c5b61546e15f63eebcdf ""
-  "report.aux" 1765663416.79736 2359 7eae15e5c3dfa760227d746b4a46aded "pdflatex"
-  "report.tex" 1765663415.83252 18638 dd5697b5b66b488de660d45be7be6d8b ""
+  "figures/episodic_returns.pdf" 1765665837.80867 45892 c3b79f03dca4ac4c0f8f43291dad5f92 ""
+  "figures/network_transfer.pdf" 1765665838.14971 26896 bd4e8b82643deaab39a333a4f535fca0 ""
+  "report.aux" 1765666175.88748 3223 b89a6510b7c031e4e3cc1fd28b5429c9 "pdflatex"
+  "report.tex" 1765666174.87375 21591 e83d43c0b0a1c157ae7d4030c86dabd3 ""
   (generated)
   "report.aux"
   "report.log"

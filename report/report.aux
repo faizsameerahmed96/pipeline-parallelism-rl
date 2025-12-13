@@ -25,6 +25,8 @@
 \@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-A}}Experimental Setup}{2}{}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-B}}Network Architecture and Partitioning}{2}{}\protected@file@percent }
 \citation{dgc2018}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-C}}Gradient Accumulation with Percentile-Based Sparsification}{3}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {V}Evaluation Results}{3}{}\protected@file@percent }
 \bibcite{nair2015}{1}
 \bibcite{impala2018}{2}
 \bibcite{apex2018}{3}
@@ -37,6 +39,9 @@
 \bibcite{zero2020}{10}
 \bibcite{lim2020}{11}
 \bibcite{feng2023}{12}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-C}}Gradient Accumulation with Percentile-Based Sparsification}{3}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{References}{3}{}\protected@file@percent }
-\gdef \@abspage@last{3}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Training performance comparison. EMA-smoothed episodic returns show 90th percentile sparsification maintains reasonable learning dynamics, achieving 47\% of baseline performance. The dashed vertical line indicates warm start completion at 30,000 steps.}}{4}{}\protected@file@percent }
+\newlabel{fig:returns}{{1}{4}{}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Cumulative network transfer comparison. Gradient accumulation with 90th percentile threshold reduces data transfer by 37.5\%, saving 53.42 GB over 400,000 training steps while maintaining 47\% of baseline learning performance.}}{4}{}\protected@file@percent }
+\newlabel{fig:network}{{2}{4}{}{}{}}
+\@writefile{toc}{\contentsline {section}{References}{4}{}\protected@file@percent }
+\gdef \@abspage@last{4}
