@@ -1,6 +1,6 @@
 # Fdb version 4
-["pdflatex"] 1765666495.76061 "/Users/faizahmed/Documents/SJSU/CS297/pipeline-parallelism-rl/report/report.tex" "report.pdf" "report" 1765666496.20268 0
-  "/Users/faizahmed/Documents/SJSU/CS297/pipeline-parallelism-rl/report/report.tex" 1765666495.16447 23628 b36451de878a447fe605ca3d4fc6091c ""
+["pdflatex"] 1765666957.16195 "/Users/faizahmed/Documents/SJSU/CS297/pipeline-parallelism-rl/report/report.tex" "report.pdf" "report" 1765666957.66288 0
+  "/Users/faizahmed/Documents/SJSU/CS297/pipeline-parallelism-rl/report/report.tex" 1765666957.04521 23610 37fd27d416a3a3c6385feaa2b0889968 ""
   "/usr/local/texlive/2024/texmf-dist/fonts/enc/dvips/base/8r.enc" 1165713224 4850 80dc9bab7f31fb78a000ccfed0e27cab ""
   "/usr/local/texlive/2024/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "/usr/local/texlive/2024/texmf-dist/fonts/tfm/adobe/times/ptmb7t.tfm" 1136768653 2172 fd0c924230362ff848a33632ed45dc23 ""
@@ -84,8 +84,8 @@
   "/usr/local/texlive/2024/texmf.cnf" 1710266656 577 e590dabc9e28c5b61546e15f63eebcdf ""
   "figures/episodic_returns.pdf" 1765665837.80867 45892 c3b79f03dca4ac4c0f8f43291dad5f92 ""
   "figures/network_transfer.pdf" 1765665838.14971 26896 bd4e8b82643deaab39a333a4f535fca0 ""
-  "report.aux" 1765666496.1516 3336 11694b7f048555aeb8bfa8396538c2a9 "pdflatex"
-  "report.tex" 1765666495.16447 23628 b36451de878a447fe605ca3d4fc6091c ""
+  "report.aux" 1765666957.60435 3336 11694b7f048555aeb8bfa8396538c2a9 "pdflatex"
+  "report.tex" 1765666957.04521 23610 37fd27d416a3a3c6385feaa2b0889968 ""
   (generated)
   "report.aux"
   "report.log"
