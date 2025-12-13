@@ -49,11 +49,12 @@ class Args:
 
     # Model saving/loading args
     save_model_freq: int | None = 10
-    cnn_network_checkpoint_path: str | None = '/workspace/runs/1764039438-grad-compression=None/models/cnn/iteration_30.pt'
-    agent_network_checkpoint_path: str | None = '/workspace/runs/1764039438-grad-compression=None/models/actor_critic/iteration_30.pt'
+    cnn_network_checkpoint_path: str | None = None
+    agent_network_checkpoint_path: str | None = None
 
     # Compression related args
-    gradient_compression_technique: str | None = None # 'stats'
+    gradient_compression_technique: str | None = 'accumulate-grads' # 'stats', 'accumulate-grads'
+    accumulate_grads_percentile: float | None = 0.99
     warm_start_steps: int = 30_000 # Number of steps before starting compression
 
     # to be filled in runtime
@@ -275,6 +276,7 @@ def main():
                 
                 # Determine whether to use gradient statistics based on warm start
                 use_gradient_stats = args.gradient_compression_technique == 'stats' and global_step >= args.warm_start_steps
+                use_accumulate_grads = args.gradient_compression_technique == 'accumulate-grads' and global_step >= args.warm_start_steps
                 
                 # Send features and loss components to machine1 for backward pass via RRef
                 # Machine1 will compute loss, backward, and return feature gradients
@@ -293,7 +295,8 @@ def main():
                     args.norm_adv,
                     args.clip_vloss,
                     gradient_stats=use_gradient_stats,
-                    accumulated_grads=True
+                    accumulated_grads=use_accumulate_grads,
+                    accumulate_grads_percentile=args.accumulate_grads_percentile
                 )
 
                 # Analyze feature_grads percentiles

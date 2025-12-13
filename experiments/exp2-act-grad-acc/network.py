@@ -141,7 +141,7 @@ class ActorCriticNetwork(nn.Module):
             return self.critic(cnn_features)
     
     def backward_and_step(self, cnn_features, actions, old_logprobs, advantages, returns, old_values, 
-                          clip_coef, vf_coef, ent_coef, norm_adv, clip_vloss, gradient_stats=False, accumulated_grads=False):
+                          clip_coef, vf_coef, ent_coef, norm_adv, clip_vloss, gradient_stats=False, accumulated_grads=False, accumulate_grads_percentile=0.90):
         """
         Perform forward pass, compute loss components, backward pass, and optimizer step.
         Returns gradients w.r.t. cnn_features to send back to machine0.
@@ -204,10 +204,10 @@ class ActorCriticNetwork(nn.Module):
             
             # Find 90th percentile of absolute gradient values from accumulated gradients
             abs_grads = torch.abs(self.global_feature_grads)
-            percentile_90 = torch.quantile(abs_grads, 0.9)
+            grads_above_accumulate_grads_percentile = torch.quantile(abs_grads, accumulate_grads_percentile)
             
             # Create mask for values above 90th percentile
-            mask = abs_grads >= percentile_90
+            mask = abs_grads >= grads_above_accumulate_grads_percentile
             
             # Get indices where mask is True
             indices = torch.nonzero(mask, as_tuple=False)  # Shape: (num_above_threshold, 2)
