@@ -1,0 +1,107 @@
+% Title of your project
+\title{JestScript - A Whimsical Dive into Humorous Programming}
+
+% Student's name
+\def\myname{John von Neumann}
+
+% Advisor's information
+\def\adv{Dr. Donald Knuth}
+\def\advemail{sample@sjsu.edu}
+
+% Committee Member's Information 1
+\def\comone{Dr. Edsger W. Dijkstra}
+\def\comoneemail{sample@sjsu.edu}
+
+% Committee Member's Information 2
+\def\comtwo{Dr. Claude Shannon}
+\def\comtwoemail{sample@sjsu.edu}
+% Affiliation (if not SJSU CS regular faculty); Leave empty if SJSU CS regular faculty)
+\def\comtwoaffil{}
+
+% CS 298/299 Semester and Year
+\def\semester{Summer}
+\def\year{1822}
+
+
+% Five to seven technical words that best describe your project (Keywords you use to search related works similar to your project on Google scholar)
+\def\keywords{programming language, enjoyable coding, programming language design, user experience, light-weight programming language}
+
+
+\maketitle % Do not remove
+
+
+% -----------
+\section{Introduction}
+% Introduction to the field
+In the realm of code seriousness, JestScript emerges as a playful endeavor, infusing the traditionally stoic world of programming with humor. 
+% Introduction to the specific area of the study
+Motivated by the desire to bring joy to coding, JestScript presents a unique take on syntax, error messages, and debugging experiences.
+
+\makekeywords % Do not remove
+
+% -----------
+\section{Problem Definition and Motivation}
+% What is a problem you are solving in your project? Why is the problem important to the research community or the public?
+The motivation behind JestScript lies in challenging the stereotypical perception of coding as a dry and serious task. With a plethora of programming languages prioritizing functionality over fun, JestScript aims to provide developers with a light-hearted alternative, fostering a more enjoyable coding
+atmosphere.
+
+% -----------
+\section{Results Achieved in CS 297}
+% List a few concrete items that you have implemented, written, or created in CS 297
+\begin{itemize}
+  \item JestScript Compiler: The JestScript compiler that translates JestScript code into executable instructions for the target platform
+  \item JestScript Syntax Guide: A detailed guide documenting the JestScript syntax, language rules, and conventions for developers.
+\end{itemize}
+
+
+% -----------
+\section{Expected Deliverables in CS 298/299}
+% List a few concrete items that you plan to implement, write, or create by the end of CS 298/299
+\begin{itemize}
+  \item Open-Source Repository: The public repository on a platform like GitHub containing the JestScript source code, documentation, and issue tracker.
+  \item User Feedback Analysis Report: A report summarizing user feedback from testing phases, outlining areas of improvement and potential future enhancements.
+\end{itemize}
+
+
+% -----------
+\section{Timeline and Milestones for CS 298/299}
+% Define several milestones for your CS 298/299
+% Decide a schedule to complete the milestones
+
+\begin{figure}[H]
+  \centering
+  \begin{ganttchart}[y unit title=0.5cm,
+    y unit chart=0.5cm,
+    vgrid,hgrid, 
+    title label anchor/.style={below=-1.6ex},
+    title left shift=.05,
+    title right shift=-.05,
+    title height=1,
+    progress label text={},
+    bar height=0.7,
+    group right shift=0,
+    group top shift=.6,
+    group height=.3]{1}{20}
+  %labels
+  \gantttitle{January}{4} 
+  \gantttitle{February}{4} 
+  \gantttitle{March}{4} 
+  \gantttitle{April}{4} 
+  \gantttitle{May}{4} \\
+  %tasks
+  \ganttbar{Compiler Tests}{1}{4} \\
+  \ganttbar{Open Source Documentation}{3}{8} \\
+  \ganttbar{User Experience Survey}{9}{11} \\
+  \ganttbar{Survey Analysis}{12}{13} \\
+  \ganttbar{Report Writing}{14}{17} \\
+  \ganttbar{Defense Preparation}{18}{19}
+  %relations 
+  % \ganttlink{elem0}{elem1} 
+  \end{ganttchart}
+\end{figure}
+
+
+% -----------
+\nocite{*} % if you add entries to ref.bib, all items will be shown.
+\bibliographystyle{ieeetr}
+{\small \bibliography{ref-example}}

@@ -1,0 +1,145 @@
+\documentclass[11pt,onecolumn]{sjsucs-proposal}
+
+% --------------------------
+% --------------------------
+% Set to 1 if you want to see an example. 
+% When you start writing your own, set to 0.
+\def\exampleflag{0} 
+% --------------------------
+% --------------------------
+
+\usepackage{geometry}
+\geometry{top=1in, bottom=1in, left=1in, right=1in}
+
+\usepackage{graphicx}
+
+\usepackage{float}
+
+\usepackage{pgfgantt}
+
+% math lib
+\usepackage{amsmath}
+\usepackage{mathrsfs}
+
+\begin{document}
+
+\if\exampleflag1
+  \input exampledoc
+\else
+
+% Title of your project
+\title{Efficient Pipeline Parallelism For Reinforcement Learning}
+
+% Student's name
+\def\myname{Faiz Sameer Ahmed}
+
+% Advisor's information
+\def\adv{Genya Ishigaki}
+\def\advemail{genya.ishigaki@sjsu.edu}
+
+% Committee Member's Information 1
+\def\comone{Fabio Di Troia}
+\def\comoneemail{fabio.ditroia@sjsu.edu}
+
+% Committee Member's Information 2
+\def\comtwo{Jelena Gligorijevic}
+\def\comtwoemail{jelena.gligorijevic@sjsu.edu}
+% Affiliation (if not SJSU CS regular faculty); Leave empty if SJSU CS regular faculty)
+\def\comtwoaffil{}
+
+% CS 298/299 Semester and Year
+\def\semester{Spring}
+\def\year{2026}
+
+
+% Five to seven technical words that best describe your project (Keywords you use to search related works similar to your project on Google scholar)
+\def\keywords{Reinforcement Learning, Pipeline Parallelism, Gradient Compression, Distributed Training}
+
+
+\maketitle % Do not remove
+
+
+% -----------
+\section{Introduction}
+% Introduction to the field
+Reinforcement Learning (RL) has proven effective for complex tasks like game playing and robotics. As models grow larger, training them requires distributing computation across multiple devices. Pipeline parallelism addresses this by splitting the neural network into stages, with each device handling different layers.
+
+% Introduction to the specific area of the study
+The challenge with pipeline parallelism is communication cost—activations and gradients must be sent between devices during both forward and backward passes. This project explores gradient compression techniques to reduce this data transfer while preserving training performance.
+
+\makekeywords % Do not remove
+
+% -----------
+\section{Problem Definition and Motivation}
+% What is a problem you are solving in your project? Why is the problem important to the research community or the public?
+When training RL models using pipeline parallelism, communication between devices becomes expensive. Activations flow forward and gradients flow backward through the pipeline, and in RL training with actor-critic networks, these exchanges happen frequently. The gradient tensors can be large, consuming bandwidth and slowing down training.
+
+While gradient compression works well for data-parallel training, it hasn't been thoroughly explored for pipeline-parallel RL. This matters because as RL models grow, we need efficient ways to train them across multiple devices. Reducing communication overhead means faster training, lower costs, and making distributed RL practical in bandwidth-constrained settings like edge computing or resource-limited clusters.
+
+% -----------
+\section{Results Achieved in CS 297}
+% List a few concrete items that you have implemented, written, or created in CS 297
+\begin{itemize}
+  \item Set up distributed training environment and measured baseline performance on Car Racing Gym
+  \item Built pipeline-parallel training system to track network usage and training metrics
+  \item Tested statistical gradient compression—it reduced communication but slowed convergence enough to cancel the gains
+  \item Implemented gradient accumulation method that showed better results
+  \item Created monitoring infrastructure with WandB, Docker containers, and data collection tools
+\end{itemize}
+
+
+% -----------
+\section{Expected Deliverables in CS 298/299}
+% List a few concrete items that you plan to implement, write, or create by the end of CS 298/299
+\begin{itemize}
+  \item Implementation of threshold-based gradient compression with adaptive scheduler
+  \item Performance comparison report analyzing threshold-based vs. p90 percentile approaches
+  \item Model convergence quality validation framework using frozen model checkpoints
+  \item Extended implementation supporting two additional RL environments (Atari Pong and LunarLander)
+  \item Final thesis report documenting methodology, experiments, and findings
+\end{itemize}
+
+
+% -----------
+\section{Timeline and Milestones for CS 298/299}
+% Define several milestones for your CS 298/299
+% Decide a schedule to complete the milestones
+
+\begin{figure}[H]
+  \centering
+  \begin{ganttchart}[y unit title=0.5cm,
+    y unit chart=0.5cm,
+    vgrid,hgrid, 
+    title label anchor/.style={below=-1.6ex},
+    title left shift=.05,
+    title right shift=-.05,
+    title height=1,
+    progress label text={},
+    bar height=0.7,
+    group right shift=0,
+    group top shift=.6,
+    group height=.3]{1}{20}
+  %labels
+  \gantttitle{January}{4} 
+  \gantttitle{February}{4} 
+  \gantttitle{March}{4} 
+  \gantttitle{April}{4} 
+  \gantttitle{May}{4} \\
+  %tasks
+  \ganttbar{Threshold-based Approach}{1}{6} \\
+  \ganttbar{Evaluations \& Model Quality}{7}{10} \\
+  \ganttbar{Additional Environments}{11}{14} \\
+  \ganttbar{Report Writing}{15}{17} \\
+  \ganttbar{Defense Preparation}{18}{19}
+  %relations 
+  % \ganttlink{elem0}{elem1} 
+  \end{ganttchart}
+\end{figure}
+
+% -----------
+\nocite{*} % if you add entries to ref.bib, all items will be shown.
+\bibliographystyle{ieeetr}
+{\small \bibliography{ref}}
+
+\fi
+\end{document}
