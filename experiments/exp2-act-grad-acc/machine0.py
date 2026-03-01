@@ -10,12 +10,12 @@ import torch
 import torch.distributed.rpc as rpc
 import torch.nn as nn
 import tyro
-import wandb
 from torch.utils.tensorboard.writer import SummaryWriter
 
 from env import make_env
 from network import ActorCriticNetwork, CNNNetwork
 from torch.distributed.rpc import RRef
+from wandb_utils import initialize_wandb_and_writer
 
 # Enable deterministic behavior
 torch.backends.cudnn.deterministic = True
@@ -52,8 +52,11 @@ class Args:
     cnn_network_checkpoint_path: str | None = None
     agent_network_checkpoint_path: str | None = None
 
+    # Wandb args
+    wandb_project: str = "data-paralellism-rl-2026-02"
+
     # Compression related args
-    gradient_compression_technique: str | None = 'accumulate-grads' # 'stats', 'accumulate-grads'
+    gradient_compression_technique: str | None = None # 'stats', 'accumulate-grads'
     accumulate_grads_percentile: float | None = 0.99
     warm_start_steps: int = 30_000 # Number of steps before starting compression
 
@@ -91,24 +94,7 @@ def main():
     run_name = f"{int(time.time())}-grad-compression={args.gradient_compression_technique}"
     print(f"Run: {run_name}")
     
-    # Initialize wandb only if API key is provided
-    wandb_api_key = os.getenv("WANDB_API_KEY")
-    if wandb_api_key:
-        wandb.init(
-            project="data-paralellism-rl",
-            entity=None,
-            sync_tensorboard=True,
-            config=vars(args),
-            name=run_name,
-            save_code=True,
-            dir="/workspace/runs",
-        )
-        # Create TensorBoard writer in wandb's run directory for automatic syncing
-        writer = SummaryWriter(f"/workspace/runs/{run_name}")
-        print("wandb initialized successfully", flush=True)
-    else:
-        writer = SummaryWriter(f"/workspace/runs/{run_name}")
-        print("WANDB_API_KEY not found, skipping wandb initialization", flush=True)
+    writer = initialize_wandb_and_writer(args, run_name)
 
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
     envs = gym.vector.SyncVectorEnv(
