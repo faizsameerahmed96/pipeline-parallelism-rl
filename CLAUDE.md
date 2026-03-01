@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a CS297/CS298 research project at SJSU implementing distributed pipeline-parallel PPO (Proximal Policy Optimization) training with gradient compression. The core research question is how gradient compression affects communication bandwidth vs. training performance in a two-machine distributed RL setup.
+This is a CS297/CS298 research project at SJSU. The goal is to research strategies to reduce the amount of data transferred between machines during distributed RL training, without significantly degrading policy performance.
 
 ## Environment Setup
 
@@ -13,27 +13,7 @@ This is a CS297/CS298 research project at SJSU implementing distributed pipeline
 - **Install dependencies:** `uv sync`
 
 ## Running Experiments
-
 The active experiment is in `experiments/exp2-act-grad-acc/`. Training requires two machines communicating via PyTorch RPC.
-
-**With Docker Compose (recommended):**
-```bash
-cd experiments/exp2-act-grad-acc
-WANDB_API_KEY=<key> docker-compose up
-```
-
-**Without Docker (two terminals / two machines):**
-```bash
-# Machine 1 first (worker/remote):
-python experiments/exp2-act-grad-acc/machine1.py
-
-# Machine 0 (master/actor):
-python experiments/exp2-act-grad-acc/machine0.py \
-  --env_id CarRacing-v3 \
-  --gradient_compression_technique accumulate-grads \
-  --accumulate_grads_percentile 0.99 \
-  --total_timesteps 500000
-```
 
 **Generating report plots:**
 ```bash
@@ -54,11 +34,6 @@ RPC calls use the pattern:
 _remote_method(ActorCriticNetwork.backward_and_step, remote_rref, features, ...)
 ```
 
-### Network Architecture (`network.py`)
-
-- **`CNNNetwork`**: Conv2d layers → 4096-dim feature vector. Runs on Machine 0.
-- **`ActorCriticNetwork`**: Linear layers → actor head (continuous actions via tanh-squashed Normal) + critic head (state value). Runs on Machine 1.
-
 ### Gradient Compression
 
 Three modes controlled by `--gradient_compression_technique`:
@@ -68,22 +43,9 @@ Three modes controlled by `--gradient_compression_technique`:
 
 Machine 0 reconstructs the sparse tensor before the CNN backward pass.
 
-### Algorithm: PPO
+### Algorithm
 
-Key hyperparameters (configurable via CLI with `tyro`):
-- `total_timesteps`: 500,000
-- `learning_rate`: 5e-5
-- `num_steps`: 128 (rollout length per env)
-- `num_envs`: 32
-- `update_epochs`: 10
-- `batch_size`: num_envs × num_steps = 4,096
-
-### Environment (`env.py`)
-
-Wraps `CarRacing-v3` from Gymnasium with:
-- Grayscale conversion
-- Frame stacking (4 frames)
-- Observation normalization to [0, 1]
+Training uses PPO (Proximal Policy Optimization). Hyper-parameters are configurable via CLI with `tyro`.
 
 ### Checkpointing
 
