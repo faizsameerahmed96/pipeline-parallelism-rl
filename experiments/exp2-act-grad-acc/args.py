@@ -9,11 +9,10 @@ class Args:
     env_id: str = "CarRacing-v3"
 
     # Algorithm specific arguments
-    total_timesteps: int = 500_000
-    learning_rate: float = 0.00005
+    total_timesteps: int = 400_000
+    learning_rate: float = 0.00004
     num_envs: int = 1
     num_steps: int = 4096
-    anneal_lr: bool = False
     gamma: float = 0.99
     gae_lambda: float = 0.95
     num_minibatches: int = 32
@@ -35,7 +34,7 @@ class Args:
     wandb_project: str = "data-paralellism-rl-2026-02"
 
     # Compression related args
-    gradient_compression_technique: str | None = None # 'stats', 'accumulate-grads'
+    gradient_compression_technique: str | None = 'accumulate-grads' # 'stats', 'accumulate-grads'
     accumulate_grads_percentile: float | None = 0.99
     warm_start_steps: int = 30_000 # Number of steps before starting compression
 

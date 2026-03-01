@@ -290,6 +290,9 @@ def main():
         writer.add_scalar("charts/network_transfer_in_mb", total_transfer_mb, global_step)
         
 
+    # Save final checkpoint at the end of training
+    save_checkpoint(args, args.num_iterations, run_name, cnn_network, remote_actor_critic_network_rref)
+
     writer.close()
     print("Machine shutting down", flush=True)
     time.sleep(1000)

@@ -88,7 +88,7 @@ class ActorCriticNetwork(nn.Module):
             layer_init(nn.Linear(512, actor_output_dim), std=0.01),
         )
 
-        self.  = nn.Parameter(torch.zeros(1, actor_output_dim))
+        self.actor_logstd = nn.Parameter(torch.zeros(1, actor_output_dim))
         
         # Initialize optimizer for this network
         self.optimizer = torch.optim.Adam(self.parameters(), lr=1e-5)
