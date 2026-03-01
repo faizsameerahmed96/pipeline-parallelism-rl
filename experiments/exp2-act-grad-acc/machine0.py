@@ -1,6 +1,5 @@
 import os
 import time
-from dataclasses import dataclass
 import random
 
 import gymnasium as gym
@@ -9,14 +8,12 @@ import psutil
 import torch
 import torch.distributed.rpc as rpc
 import torch.nn as nn
-import tyro
-from torch.utils.tensorboard.writer import SummaryWriter
 
 from env import make_env
 from network import ActorCriticNetwork, CNNNetwork
 from torch.distributed.rpc import RRef
 from wandb_utils import initialize_wandb_and_writer
-from args import Args, get_args
+from args import get_args
 
 
 def _call_method(method, rref, *args, **kwargs):
@@ -47,6 +44,7 @@ def main():
     writer = initialize_wandb_and_writer(args, run_name)
 
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
+
     envs = gym.vector.SyncVectorEnv(
         [
             make_env(args.env_id, i, False, run_name, args.gamma)
@@ -56,25 +54,10 @@ def main():
 
     cnn_network = CNNNetwork(envs, learning_rate=args.learning_rate).to(device)
     
-    # Load CNN checkpoint if provided and track starting iteration
-    start_iteration = 0
-    if args.cnn_network_checkpoint_path is not None:
-        start_iteration = cnn_network.load_model(args.cnn_network_checkpoint_path)
-        print(f"Resuming from iteration {start_iteration}", flush=True)
-
     remote_actor_critic_network_rref = rpc.remote("worker1", ActorCriticNetwork)
     print(f"Remote reference to worker1 obtained.", flush=True)
     
-    # Load ActorCritic checkpoint if provided
-    if args.agent_network_checkpoint_path is not None:
-        loaded_iteration = _remote_method(
-            ActorCriticNetwork.load_model,
-            remote_actor_critic_network_rref,
-            args.agent_network_checkpoint_path
-        )
-        # Verify both checkpoints are from the same iteration
-        if start_iteration != loaded_iteration:
-            raise Exception("CNN and ActorCritic checkpoints are from different iterations!")
+    start_iteration = load_existing_checkpoints(args, cnn_network, remote_actor_critic_network_rref)
 
     optimizer = cnn_network.optimizer
 
@@ -106,19 +89,7 @@ def main():
 
         # Save model checkpoint if save_model_freq is specified
         if args.save_model_freq is not None and iteration % args.save_model_freq == 0:
-            checkpoint_dir = f"/workspace/runs/{run_name}/models/"
-            os.makedirs(checkpoint_dir, exist_ok=True)
-
-            # Save CNN network
-            cnn_network.save_model(checkpoint_dir, iteration, args)
-            
-            # Save ActorCritic network remotely
-            _remote_method(
-                ActorCriticNetwork.save_model,
-                remote_actor_critic_network_rref,
-                checkpoint_dir,
-                iteration
-            )
+            save_checkpoint(args, iteration, run_name, cnn_network, remote_actor_critic_network_rref)
 
         # Rollout
         for step in range(0, args.num_steps):
@@ -322,6 +293,46 @@ def main():
     writer.close()
     print("Machine shutting down", flush=True)
     time.sleep(1000)
+
+
+def load_existing_checkpoints(args, cnn_network, remote_actor_critic_network_rref):
+    """Load existing checkpoints for CNN and ActorCritic networks if provided."""
+    start_iteration = 0
+    
+    # Load CNN checkpoint if provided and track starting iteration
+    if args.cnn_network_checkpoint_path is not None:
+        start_iteration = cnn_network.load_model(args.cnn_network_checkpoint_path)
+        print(f"Resuming from iteration {start_iteration}", flush=True)
+    
+    # Load ActorCritic checkpoint if provided
+    if args.agent_network_checkpoint_path is not None:
+        loaded_iteration = _remote_method(
+            ActorCriticNetwork.load_model,
+            remote_actor_critic_network_rref,
+            args.agent_network_checkpoint_path
+        )
+        # Verify both checkpoints are from the same iteration
+        if start_iteration != loaded_iteration:
+            raise Exception("CNN and ActorCritic checkpoints are from different iterations!")
+    
+    return start_iteration
+
+
+def save_checkpoint(args, iteration, run_name, cnn_network, remote_actor_critic_network_rref):
+    """Save model checkpoints for both CNN and ActorCritic networks."""
+    checkpoint_dir = f"/workspace/runs/{run_name}/models/"
+    os.makedirs(checkpoint_dir, exist_ok=True)
+
+    # Save CNN network
+    cnn_network.save_model(checkpoint_dir, iteration, args)
+    
+    # Save ActorCritic network remotely
+    _remote_method(
+        ActorCriticNetwork.save_model,
+        remote_actor_critic_network_rref,
+        checkpoint_dir,
+        iteration
+    )
 
 
 def setup():
