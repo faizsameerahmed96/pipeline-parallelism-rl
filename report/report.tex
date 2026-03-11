@@ -30,7 +30,7 @@ genya.ishigaki@sjsu.edu}
 \maketitle
 
 \begin{abstract}
-Reinforcement learning trains agents through interaction with environments, alternating between a rollout phase where experiences are collected and a training phase where policy and value networks are updated. Traditional distributed RL architectures transfer collected experiences to a centralized server that trains the actor-critic network and returns updated parameters. However, when deploying large neural networks in resource-constrained environments that require model parallelism across multiple devices, communication overhead increases substantially. Pipeline parallelism necessitates transferring both forward activations and backward gradients between devices for each training epoch, which can be repeated 10 or more times per batch for sample efficiency. This paper presents a gradient accumulation technique that selectively transmits high-magnitude gradients above a specified percentile threshold during backward propagation. By accumulating gradients over time and only communicating the most significant values, we reduce network transfer by up to 90 percent while maintaining comparable training performance to full gradient communication.
+Reinforcement learning trains agents through interaction with environments, alternating between a rollout phase where experiences are collected and a training phase where policy and value networks are updated. Traditional distributed RL architectures transfer collected experiences to a centralized server that trains the actor-critic network and returns updated parameters. However, when deploying large neural networks in resource-constrained environments that require model parallelism across multiple devices, communication overhead increases substantially. Pipeline parallelism necessitates transferring both forward activations and backward gradients between devices for each training epoch, which can be repeated 10 or more times per batch for sample efficiency. This paper presents a gradient accumulation technique that selectively transmits high-magnitude gradients above a specified percentile threshold during backward propagation. By accumulating gradients over time and only communicating the most significant values, we reduce network transfer by 34 percent while maintaining comparable training performance to full gradient communication.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -43,7 +43,7 @@ Reinforcement learning trains intelligent agents through environmental interacti
 
 Traditional distributed RL systems use centralized architectures where edge devices collect experiences while cloud servers train models. However, when models become too large for a single device's memory, pipeline parallelism becomes essential, partitioning networks into sequential stages across multiple devices. Unlike centralized training where only experiences and parameters are transferred, pipeline parallelism requires continuous exchange of forward activations and backward gradients between devices. This communication occurs repeatedly as we run multiple training passes over the data for sample efficiency, creating substantial overhead in bandwidth-limited environments.
 
-This paper addresses this communication challenge through selective gradient transmission. We present a gradient accumulation technique that identifies and communicates only the most significant gradients based on magnitude percentile thresholds. Section II reviews related work. Section III defines the problem and quantifies communication overhead. Section IV describes our method. Section V presents experimental results demonstrating network transfer reduction of 37.5 percent while maintaining comparable performance. Section VI discusses future work.
+This paper addresses this communication challenge through selective gradient transmission. We present a gradient accumulation technique that identifies and communicates only the most significant gradients based on magnitude percentile thresholds. Section II reviews related work. Section III defines the problem and quantifies communication overhead. Section IV describes our method. Section V presents experimental results demonstrating network transfer reduction of 34 percent while maintaining comparable performance.
 
 \section{Related Work}
 
@@ -160,35 +160,31 @@ The key advantage of this approach for RL is that repeated training epochs natur
 
 We evaluate our gradient accumulation approach across three configurations over 100 training iterations (409,600 timesteps) on CarRacing-v3: (1) baseline pipeline parallelism without compression, (2) 90th percentile sparsification, and (3) 99th percentile sparsification. Episodic returns are smoothed using exponential moving average (EMA) with decay 0.9.
 
-Figure \ref{fig:returns} shows training performance. The vertical dashed line marks the warm start boundary at 30,000 steps. The 90th percentile configuration demonstrates steady convergence toward baseline performance throughout training. In contrast, the 99th percentile configuration severely impedes learning, demonstrating that excessive sparsification discards critical gradient information.
+Figure \ref{fig:returns} shows training performance. The vertical dashed line marks the warm start boundary at 30,000 steps. The 90th percentile configuration demonstrates steady convergence toward baseline performance throughout training. In contrast, the 99th percentile configuration completely fails to learn, with returns remaining near zero, demonstrating that excessive sparsification discards critical gradient information required for effective policy learning.
 
 \begin{figure}[htbp]
 \centerline{\includegraphics[width=\columnwidth]{figures/episodic_returns.pdf}}
-\caption{Training performance comparison. EMA-smoothed episodic returns show 90th percentile sparsification converges toward baseline performance. The dashed vertical line indicates warm start completion at 30,000 steps.}
+\caption{Training performance comparison. EMA-smoothed episodic returns show 90th percentile sparsification converges toward baseline performance, while 99th percentile fails to learn. The dashed vertical line indicates warm start completion at 30,000 steps.}
 \label{fig:returns}
 \end{figure}
 
-Figure \ref{fig:network} presents cumulative data transfer. The baseline transmits 142.55 GB total, while the 90th percentile configuration achieves 37.5\% reduction (89.13 GB)—saving 53.42 GB. The 90th percentile configuration strikes a favorable balance: converging toward baseline performance while achieving substantial bandwidth savings for bandwidth-constrained deployments.
+Figure \ref{fig:network} presents cumulative data transfer. The baseline transmits 133.86 GB total, while the 90th percentile configuration achieves 34\% reduction (88.38 GB)—saving 45.48 GB. The 90th percentile configuration strikes a favorable balance: converging toward baseline performance while achieving substantial bandwidth savings for bandwidth-constrained deployments.
 
 \begin{figure}[htbp]
 \centerline{\includegraphics[width=\columnwidth]{figures/network_transfer.pdf}}
-\caption{Cumulative network transfer comparison. Gradient accumulation with 90th percentile threshold reduces data transfer by 37.5\%, saving 53.42 GB over 400,000 training steps.}
+\caption{Cumulative network transfer comparison. Gradient accumulation with 90th percentile threshold reduces data transfer by 34\%, saving 45.48 GB over 400,000 training steps.}
 \label{fig:network}
 \end{figure}
 
 Our results demonstrate that percentile-based gradient accumulation effectively reduces communication overhead in pipeline-parallel RL training while maintaining convergence. Unlike supervised learning where gradients exhibit higher redundancy, RL gradients are more sensitive to lossy compression.
 
-\section{Future Work (CS298 Plan)}
+To further characterize final policy quality, we evaluated each trained checkpoint over 100 independent environment episodes with a fixed random seed, and compared the resulting return distributions. Each checkpoint was loaded after training completed and rolled out in CarRacing-v3 without any further updates — providing an unbiased estimate of the learned policy's generalization. Figure \ref{fig:boxplot} shows box plots of episodic returns for the baseline and 90th percentile configurations. The baseline achieves a mean return of 398.97 ($\pm$226.58) with a median of 376.68, while gradient accumulation achieves a mean of 305.32 ($\pm$161.73) with a median of 283.18. Notably, the interquartile ranges substantially overlap—the gradient accumulation Q1–Q3 range of [190, 416] versus the baseline range of [284, 520]—and the 90th percentile model achieves 76.5\% of baseline mean performance. The tighter standard deviation under compression (161.73 vs. 226.58) suggests the compressed model produces more consistent, if somewhat lower, returns. These results indicate that gradient accumulation does not catastrophically degrade policy quality, and the performance gap may narrow further with additional training.
 
-While this work focused on reducing backward gradient communication, several promising directions remain for further investigation in CS298.
-
-\textbf{Forward Activation Compression:} Our current approach compresses only backward gradients, yet forward activations contribute equally to communication overhead. Applying similar percentile-based sparsification to the 4,096-dimensional feature vectors transmitted during policy rollout could yield additional bandwidth savings. However, unlike gradients which can be accumulated over multiple minibatches, forward activations must be transmitted immediately for action selection, presenting unique challenges for sparsification strategies that maintain policy quality.
-
-\textbf{Autoencoder-Based Compression:} Lightweight autoencoders could learn compressed representations of activations and gradients. Machine 1 would train an encoder compressing feature vectors or gradients into lower-dimensional latent codes, transmitting only these codes and a decoder to Machine 0. This could achieve superior compression ratios while better preserving information about complex gradient distributions.
-
-\textbf{Asynchronous Training:} Our current synchronous pipeline requires Machine 0 to wait for gradient updates from Machine 1 before proceeding to the next minibatch. Implementing asynchronous training—where Machine 0 continues forward passes while Machine 1 processes gradients from previous batches—could improve training throughput and better utilize both machines. This would require careful handling of gradient staleness and parameter versioning, potentially drawing inspiration from IMPALA's importance sampling corrections to maintain training stability despite asynchronous updates.
-
-These extensions would provide a comprehensive framework for communication-efficient pipeline-parallel RL training, addressing both forward and backward data transfer while exploring alternative compression paradigms and training synchronization strategies.
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\columnwidth]{figures/performance_comparison.pdf}}
+\caption{Evaluation return distributions over 100 independent episodes per checkpoint (no further training). Box plots show median, IQR, and whiskers (1.5$\times$IQR). Gradient accumulation (90th percentile) achieves 76.5\% of baseline mean return with overlapping IQRs, indicating the performance gap is moderate rather than catastrophic.}
+\label{fig:boxplot}
+\end{figure}
 
 \begin{thebibliography}{00}
 \bibitem{nair2015} A. Nair, P. Srinivasan, S. Blackwell, C. Alcicek, R. Fearon, A. De Maria, V. Panneershelvam, M. Suleyman, C. Beattie, S. Petersen, et al., ``Massively parallel methods for deep reinforcement learning,'' in \textit{ICML Deep Learning Workshop}, 2015.

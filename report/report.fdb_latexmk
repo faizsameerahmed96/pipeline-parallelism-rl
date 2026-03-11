@@ -1,6 +1,6 @@
 # Fdb version 4
-["pdflatex"] 1765667275.24286 "/Users/faizahmed/Documents/SJSU/CS297/pipeline-parallelism-rl/report/report.tex" "report.pdf" "report" 1765667275.69547 0
-  "/Users/faizahmed/Documents/SJSU/CS297/pipeline-parallelism-rl/report/report.tex" 1765667274.64951 22801 205a9bf5033a9069fb79bfd7fb0cf24d ""
+["pdflatex"] 1773016465.95128 "/Users/faizahmed/Documents/SJSU/CS297/pipeline-parallelism-rl/report/report.tex" "report.pdf" "report" 1773016466.42495 0
+  "/Users/faizahmed/Documents/SJSU/CS297/pipeline-parallelism-rl/report/report.tex" 1773016465.38174 22542 b75853cea04244847f04754d9079fff6 ""
   "/usr/local/texlive/2024/texmf-dist/fonts/enc/dvips/base/8r.enc" 1165713224 4850 80dc9bab7f31fb78a000ccfed0e27cab ""
   "/usr/local/texlive/2024/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "/usr/local/texlive/2024/texmf-dist/fonts/tfm/adobe/times/ptmb7t.tfm" 1136768653 2172 fd0c924230362ff848a33632ed45dc23 ""
@@ -22,7 +22,9 @@
   "/usr/local/texlive/2024/texmf-dist/fonts/tfm/public/amsfonts/symbols/msbm7.tfm" 1246382020 940 228d6584342e91276bf566bcf9716b83 ""
   "/usr/local/texlive/2024/texmf-dist/fonts/tfm/public/cm/cmbx10.tfm" 1136768653 1328 c834bbb027764024c09d3d2bf908b5f0 ""
   "/usr/local/texlive/2024/texmf-dist/fonts/tfm/public/cm/cmbx5.tfm" 1136768653 1332 f817c21a1ba54560425663374f1b651a ""
+  "/usr/local/texlive/2024/texmf-dist/fonts/tfm/public/cm/cmbx6.tfm" 1136768653 1344 8a0be4fe4d376203000810ad4dc81558 ""
   "/usr/local/texlive/2024/texmf-dist/fonts/tfm/public/cm/cmbx7.tfm" 1136768653 1336 3125ccb448c1a09074e3aa4a9832f130 ""
+  "/usr/local/texlive/2024/texmf-dist/fonts/tfm/public/cm/cmbx8.tfm" 1136768653 1332 1fde11373e221473104d6cc5993f046e ""
   "/usr/local/texlive/2024/texmf-dist/fonts/tfm/public/cm/cmmi6.tfm" 1136768653 1512 f21f83efb36853c0b70002322c1ab3ad ""
   "/usr/local/texlive/2024/texmf-dist/fonts/tfm/public/cm/cmmi8.tfm" 1136768653 1520 eccf95517727cb11801f4f1aee3a21b4 ""
   "/usr/local/texlive/2024/texmf-dist/fonts/tfm/public/cm/cmr6.tfm" 1136768653 1300 b62933e007d01cfd073f79b963c01526 ""
@@ -82,10 +84,11 @@
   "/usr/local/texlive/2024/texmf-var/fonts/map/pdftex/updmap/pdftex.map" 1727768635.67795 5467645 128b85b7cde5f5edc5cb7f1dd7ff8736 ""
   "/usr/local/texlive/2024/texmf-var/web2c/pdftex/pdflatex.fmt" 1727768611 8221412 04c89ba4e1f6a9ec48d798131f3412a9 ""
   "/usr/local/texlive/2024/texmf.cnf" 1710266656 577 e590dabc9e28c5b61546e15f63eebcdf ""
-  "figures/episodic_returns.pdf" 1765665837.80867 45892 c3b79f03dca4ac4c0f8f43291dad5f92 ""
-  "figures/network_transfer.pdf" 1765665838.14971 26896 bd4e8b82643deaab39a333a4f535fca0 ""
-  "report.aux" 1765667275.64373 3239 d16b6baeb71778842ff610ae2b00a5b9 "pdflatex"
-  "report.tex" 1765667274.64951 22801 205a9bf5033a9069fb79bfd7fb0cf24d ""
+  "figures/episodic_returns.pdf" 1773016138.29684 33852 9b35f4e2c30a7a3009785ef5efa200f9 ""
+  "figures/network_transfer.pdf" 1773016138.44878 26842 f11d7d5f039296667ba46a960762d9e3 ""
+  "figures/performance_comparison.pdf" 1773016335.31938 28473 014fed59552b986887d472dea66b85b1 ""
+  "report.aux" 1773016466.37198 3633 541b53b7a00e535b6a705df6e901dc07 "pdflatex"
+  "report.tex" 1773016465.38174 22542 b75853cea04244847f04754d9079fff6 ""
   (generated)
   "report.aux"
   "report.log"

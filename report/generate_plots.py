@@ -16,8 +16,8 @@ plt.rcParams['legend.fontsize'] = 9
 plt.rcParams['figure.dpi'] = 300
 
 # Load data
-returns_df = pd.read_csv('data/returns.csv')
-data_usage_df = pd.read_csv('data/data_usage.csv')
+returns_df = pd.read_csv('data_2/wandb_export_2026-03-08T17_19_48.716-07_00.csv')
+data_usage_df = pd.read_csv('data_2/wandb_export_2026-03-08T17_20_04.549-07_00.csv')
 
 # Define color scheme matching the description
 colors = {
@@ -27,30 +27,50 @@ colors = {
 }
 
 # Column names
-none_return = '1765346213-grad-compression=None - charts/episodic_return'
-p90_return = '1765346490-grad-compression=accumulate-grads - charts/episodic_return'
-p99_return = '1765346631-grad-compression=accumulate-grads - charts/episodic_return'
+none_return = 'baseline - charts/episodic_return'
+p90_return = '1772388591-grad-compression=accumulate-grads - charts/episodic_return'
+p99_return = 'accumulate-grads_30kwarmup - charts/episodic_return'
 
-none_data = '1765346213-grad-compression=None - charts/network_transfer_in_mb'
-p90_data = '1765346490-grad-compression=accumulate-grads - charts/network_transfer_in_mb'
-p99_data = '1765346631-grad-compression=accumulate-grads - charts/network_transfer_in_mb'
+none_data = 'baseline - charts/network_transfer_in_mb'
+p90_data = '1772388591-grad-compression=accumulate-grads - charts/network_transfer_in_mb'
+p99_data = 'accumulate-grads_30kwarmup - charts/network_transfer_in_mb'
 
-# Apply EMA smoothing
-def ema_smooth(data, alpha=0.9):
-    """Apply exponential moving average smoothing"""
+# Apply time-weighted EMA smoothing
+def ema_smooth(data, steps, alpha=0.9):
+    """Apply time-weighted exponential moving average smoothing.
+    The decay is adjusted by the actual time gap between observations,
+    normalized by the median step interval, so alpha=0.9 corresponds
+    to one median-length step of decay."""
+    data = np.array(data, dtype=float)
+    steps = np.array(steps, dtype=float)
+    dt = np.diff(steps)
+    dt_ref = np.median(dt[dt > 0]) if np.any(dt > 0) else 1.0
+
     smoothed = np.zeros_like(data)
     smoothed[0] = data[0]
     for i in range(1, len(data)):
+        delta = steps[i] - steps[i - 1]
+        alpha_eff = alpha ** (delta / dt_ref)
         if not np.isnan(data[i]):
-            smoothed[i] = alpha * smoothed[i-1] + (1 - alpha) * data[i]
+            smoothed[i] = alpha_eff * smoothed[i - 1] + (1 - alpha_eff) * data[i]
         else:
-            smoothed[i] = smoothed[i-1]
+            smoothed[i] = smoothed[i - 1]
     return smoothed
 
-# Smooth returns data
-returns_df['none_smooth'] = ema_smooth(returns_df[none_return].fillna(method='ffill'))
-returns_df['p90_smooth'] = ema_smooth(returns_df[p90_return].fillna(method='ffill'))
-returns_df['p99_smooth'] = ema_smooth(returns_df[p99_return].fillna(method='ffill'))
+def smooth_series(df, col):
+    """Smooth only the rows where a run actually logged a value,
+    then interpolate back onto the full step index — matching W&B behaviour."""
+    mask = df[col].notna()
+    sub = df.loc[mask, ['global_step', col]].copy()
+    sub['smoothed'] = ema_smooth(sub[col].values, sub['global_step'].values)
+    # Reindex back to all steps via linear interpolation
+    result = sub.set_index('global_step')['smoothed'].reindex(df['global_step']).interpolate('index')
+    return result.values
+
+# Smooth returns data — each run smoothed on its own logged points only
+returns_df['none_smooth'] = smooth_series(returns_df, none_return)
+returns_df['p90_smooth'] = smooth_series(returns_df, p90_return)
+returns_df['p99_smooth'] = smooth_series(returns_df, p99_return)
 
 # Figure 1: Episodic Returns
 fig, ax = plt.subplots(figsize=(7, 4))

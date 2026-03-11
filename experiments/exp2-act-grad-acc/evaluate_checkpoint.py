@@ -25,13 +25,10 @@ class EvalArgs:
     """Arguments for checkpoint evaluation."""
     cnn_checkpoint_path: str
     actor_critic_checkpoint_path: str
-    num_episodes: int = 10
+    num_episodes: int = 100
     seed: int = 42
     cuda: bool = False
     env_id: str = "CarRacing-v3"
-
-
-
 
 
 def evaluate_checkpoint(args: EvalArgs) -> List[float]:
@@ -84,7 +81,7 @@ def evaluate_checkpoint(args: EvalArgs) -> List[float]:
                 cnn_features = cnn_network(obs)
                 
                 # Get action from local ActorCritic
-                action, _, _ = actor_critic_network.get_action_and_value(
+                action, _, _, _ = actor_critic_network.get_action_and_value(
                     cnn_features,
                     no_grad=True
                 )

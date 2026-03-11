@@ -1,0 +1,3 @@
+configuration,Episodes,Mean,Std Dev,Min,Q1,Median,Q3,Max,95% CI
+Gradient Accumulation,100,305.324,161.726,-1.887,190.125,283.183,415.996,766.906,"[273.63, 337.02]"
+No Compression,100,398.966,226.576,-18.714,283.598,376.675,519.864,892.565,"[354.56, 443.38]"
