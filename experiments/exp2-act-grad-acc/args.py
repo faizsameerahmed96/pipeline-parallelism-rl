@@ -9,7 +9,7 @@ class Args:
     env_id: str = "CarRacing-v3"
 
     # Algorithm specific arguments
-    total_timesteps: int = 400_000
+    total_timesteps: int = 1_000_000
     learning_rate: float = 0.00004
     num_envs: int = 1
     num_steps: int = 4096
