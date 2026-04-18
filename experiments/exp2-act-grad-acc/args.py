@@ -36,6 +36,7 @@ class Args:
     # Compression related args
     gradient_compression_technique: str | None = 'accumulate-grads' # 'stats', 'accumulate-grads'
     accumulate_grads_percentile: float | None = 0.90
+    decay_buffer: float = 0.95 # Decay factor for accumulated gradients buffer (1.0 = no decay)
     warm_start_steps: int = 30_000 # Number of steps before starting compression
 
     # to be filled in runtime

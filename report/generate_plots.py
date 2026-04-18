@@ -19,14 +19,20 @@ plt.rcParams['figure.dpi'] = 300
 returns_df = pd.read_csv('data_2/wandb_export_2026-03-08T17_19_48.716-07_00.csv')
 data_usage_df = pd.read_csv('data_2/wandb_export_2026-03-08T17_20_04.549-07_00.csv')
 
+# Load decay experiment data
+decay_returns_df = pd.read_csv('data_3/returns.csv')
+decay_data_usage_df = pd.read_csv('data_3/data_usage.csv')
+
 # Define color scheme matching the description
 colors = {
     'red': '#d62728',    # Naive split learning (no compression)
     'blue': '#1f77b4',   # 90th percentile
-    'green': '#2ca02c'   # 99th percentile
+    'green': '#2ca02c',  # 99th percentile
+    'orange': '#ff7f0e', # 90p + 0.99 decay
+    'purple': '#9467bd', # 90p + 0.95 decay
 }
 
-# Column names
+# Column names (original experiment)
 none_return = 'baseline - charts/episodic_return'
 p90_return = '1772388591-grad-compression=accumulate-grads - charts/episodic_return'
 p99_return = 'accumulate-grads_30kwarmup - charts/episodic_return'
@@ -34,6 +40,17 @@ p99_return = 'accumulate-grads_30kwarmup - charts/episodic_return'
 none_data = 'baseline - charts/network_transfer_in_mb'
 p90_data = '1772388591-grad-compression=accumulate-grads - charts/network_transfer_in_mb'
 p99_data = 'accumulate-grads_30kwarmup - charts/network_transfer_in_mb'
+
+# Column names (decay experiment)
+decay_none_return = '1774138806-grad-compression=None - charts/episodic_return'
+decay_p90_return = '1774140526-grad-compression=accumulate-grads - charts/episodic_return'
+decay_095_return = '90p gc + 0.95 decay - charts/episodic_return'
+decay_099_return = '90p gc + 0.99 decay - charts/episodic_return'
+
+decay_none_data = '1774138806-grad-compression=None - charts/network_transfer_in_mb'
+decay_p90_data = '1774140526-grad-compression=accumulate-grads - charts/network_transfer_in_mb'
+decay_095_data = '90p gc + 0.95 decay - charts/network_transfer_in_mb'
+decay_099_data = '90p gc + 0.99 decay - charts/network_transfer_in_mb'
 
 # Apply time-weighted EMA smoothing
 def ema_smooth(data, steps, alpha=0.9):
@@ -67,57 +84,63 @@ def smooth_series(df, col):
     result = sub.set_index('global_step')['smoothed'].reindex(df['global_step']).interpolate('index')
     return result.values
 
-# Smooth returns data — each run smoothed on its own logged points only
-returns_df['none_smooth'] = smooth_series(returns_df, none_return)
-returns_df['p90_smooth'] = smooth_series(returns_df, p90_return)
-returns_df['p99_smooth'] = smooth_series(returns_df, p99_return)
+# ============================================================
+# Main figures now use data_3 (latest runs, 4 configurations)
+# ============================================================
+MAX_STEP = 723000
 
-# Figure 1: Episodic Returns
+# Smooth returns data
+decay_returns_df['none_smooth'] = smooth_series(decay_returns_df, decay_none_return)
+decay_returns_df['p90_smooth'] = smooth_series(decay_returns_df, decay_p90_return)
+decay_returns_df['d095_smooth'] = smooth_series(decay_returns_df, decay_095_return)
+decay_returns_df['d099_smooth'] = smooth_series(decay_returns_df, decay_099_return)
+
+# Cut to shortest run
+decay_returns_cut = decay_returns_df[decay_returns_df['global_step'] <= MAX_STEP].copy()
+decay_data_usage_cut = decay_data_usage_df[decay_data_usage_df['global_step'] <= MAX_STEP].copy()
+
+# Figure 1: Episodic Returns (all 4 configurations)
 fig, ax = plt.subplots(figsize=(7, 4))
 
-ax.plot(returns_df['global_step'], returns_df['none_smooth'], 
+ax.plot(decay_returns_cut['global_step'], decay_returns_cut['none_smooth'],
         color=colors['red'], linewidth=1.5, label='No Compression', alpha=0.9)
-ax.plot(returns_df['global_step'], returns_df['p90_smooth'], 
+ax.plot(decay_returns_cut['global_step'], decay_returns_cut['p90_smooth'],
         color=colors['blue'], linewidth=1.5, label='90th Percentile', alpha=0.9)
-ax.plot(returns_df['global_step'], returns_df['p99_smooth'], 
-        color=colors['green'], linewidth=1.5, label='99th Percentile', alpha=0.9)
+ax.plot(decay_returns_cut['global_step'], decay_returns_cut['d099_smooth'],
+        color=colors['orange'], linewidth=1.5, label='90th Percentile + 0.99 Decay', alpha=0.9)
+ax.plot(decay_returns_cut['global_step'], decay_returns_cut['d095_smooth'],
+        color=colors['purple'], linewidth=1.5, label='90th Percentile + 0.95 Decay', alpha=0.9)
 
-# Add warm start line
-ax.axvline(x=30000, color='black', linestyle='--', linewidth=1, 
+ax.axvline(x=30000, color='black', linestyle='--', linewidth=1,
            label='Warm Start End', alpha=0.6)
 
 ax.set_xlabel('Training Steps', fontsize=11)
 ax.set_ylabel('Episodic Return (EMA)', fontsize=11)
 ax.set_title('Training Performance Comparison', fontsize=12, fontweight='bold')
-ax.legend(loc='lower right', frameon=True, fancybox=True, shadow=True)
+ax.legend(loc='upper left', frameon=True, fancybox=True, shadow=True)
 ax.grid(True, alpha=0.3, linestyle=':')
-ax.set_xlim(0, returns_df['global_step'].max())
+ax.set_xlim(0, MAX_STEP)
 
 plt.tight_layout()
 plt.savefig('figures/episodic_returns.pdf', bbox_inches='tight', dpi=300)
 plt.savefig('figures/episodic_returns.png', bbox_inches='tight', dpi=300)
 print("Saved episodic_returns.pdf and episodic_returns.png")
 
-# Figure 2: Network Transfer
+# Figure 2: Network Transfer (all 4 configurations)
 fig, ax = plt.subplots(figsize=(7, 4))
 
-# Filter out NaN values and plot
-none_mask = ~data_usage_df[none_data].isna()
-p90_mask = ~data_usage_df[p90_data].isna()
-p99_mask = ~data_usage_df[p99_data].isna()
+for col, label, color in [
+    (decay_none_data, 'No Compression', colors['red']),
+    (decay_p90_data, '90th Percentile', colors['blue']),
+    (decay_099_data, '90th Percentile + 0.99 Decay', colors['orange']),
+    (decay_095_data, '90th Percentile + 0.95 Decay', colors['purple']),
+]:
+    mask = decay_data_usage_cut[col].notna()
+    ax.plot(decay_data_usage_cut.loc[mask, 'global_step'],
+            decay_data_usage_cut.loc[mask, col] / 1024,
+            color=color, linewidth=1.5, label=label, alpha=0.9)
 
-ax.plot(data_usage_df.loc[none_mask, 'global_step'], 
-        data_usage_df.loc[none_mask, none_data] / 1024,  # Convert to GB
-        color=colors['red'], linewidth=1.5, label='No Compression', alpha=0.9)
-ax.plot(data_usage_df.loc[p90_mask, 'global_step'], 
-        data_usage_df.loc[p90_mask, p90_data] / 1024,
-        color=colors['blue'], linewidth=1.5, label='90th Percentile', alpha=0.9)
-ax.plot(data_usage_df.loc[p99_mask, 'global_step'], 
-        data_usage_df.loc[p99_mask, p99_data] / 1024,
-        color=colors['green'], linewidth=1.5, label='99th Percentile', alpha=0.9)
-
-# Add warm start line
-ax.axvline(x=30000, color='black', linestyle='--', linewidth=1, 
+ax.axvline(x=30000, color='black', linestyle='--', linewidth=1,
            label='Warm Start End', alpha=0.6)
 
 ax.set_xlabel('Training Steps', fontsize=11)
@@ -125,7 +148,7 @@ ax.set_ylabel('Cumulative Data Transfer (GB)', fontsize=11)
 ax.set_title('Communication Overhead Comparison', fontsize=12, fontweight='bold')
 ax.legend(loc='upper left', frameon=True, fancybox=True, shadow=True)
 ax.grid(True, alpha=0.3, linestyle=':')
-ax.set_xlim(0, data_usage_df['global_step'].max())
+ax.set_xlim(0, MAX_STEP)
 
 plt.tight_layout()
 plt.savefig('figures/network_transfer.pdf', bbox_inches='tight', dpi=300)
@@ -133,24 +156,17 @@ plt.savefig('figures/network_transfer.png', bbox_inches='tight', dpi=300)
 print("Saved network_transfer.pdf and network_transfer.png")
 
 # Calculate final statistics
-final_step_idx = returns_df['global_step'].idxmax()
-final_none = data_usage_df.loc[none_mask, none_data].iloc[-1] / 1024
-final_p90 = data_usage_df.loc[p90_mask, p90_data].iloc[-1] / 1024
-final_p99 = data_usage_df.loc[p99_mask, p99_data].iloc[-1] / 1024
+print("\n=== Final Statistics (at 723k steps) ===")
+for name, col in [('No Compression', 'none_smooth'), ('90th Percentile', 'p90_smooth'),
+                   ('90p + 0.99 Decay', 'd099_smooth'), ('90p + 0.95 Decay', 'd095_smooth')]:
+    val = decay_returns_cut[col].dropna().iloc[-1]
+    print(f"{name}: final EMA return = {val:.2f}")
 
-print("\n=== Final Statistics ===")
-print(f"No Compression: {final_none:.2f} GB")
-print(f"90th Percentile: {final_p90:.2f} GB ({(1 - final_p90/final_none)*100:.1f}% reduction)")
-print(f"99th Percentile: {final_p99:.2f} GB ({(1 - final_p99/final_none)*100:.1f}% reduction)")
-
-# Calculate final returns
-final_return_none = returns_df['none_smooth'].iloc[-1]
-final_return_p90 = returns_df['p90_smooth'].iloc[-1]
-final_return_p99 = returns_df['p99_smooth'].iloc[-1]
-
-print(f"\nFinal Returns (EMA):")
-print(f"No Compression: {final_return_none:.2f}")
-print(f"90th Percentile: {final_return_p90:.2f}")
-print(f"99th Percentile: {final_return_p99:.2f}")
+for name, col in [('No Compression', decay_none_data), ('90th Percentile', decay_p90_data),
+                   ('90p + 0.99 Decay', decay_099_data), ('90p + 0.95 Decay', decay_095_data)]:
+    mask = decay_data_usage_cut[col].notna()
+    if mask.any():
+        val = decay_data_usage_cut.loc[mask, col].iloc[-1] / 1024
+        print(f"{name}: cumulative transfer = {val:.2f} GB")
 
 plt.close('all')

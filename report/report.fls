@@ -180,6 +180,16 @@ INPUT ./figures/performance_comparison.pdf
 INPUT ./figures/performance_comparison.pdf
 INPUT /usr/local/texlive/2024/texmf-dist/fonts/tfm/public/cm/cmbx8.tfm
 INPUT /usr/local/texlive/2024/texmf-dist/fonts/tfm/public/cm/cmbx6.tfm
+INPUT ./figures/decay_episodic_returns.pdf
+INPUT ./figures/decay_episodic_returns.pdf
+INPUT ./figures/decay_episodic_returns.pdf
+INPUT ./figures/decay_episodic_returns.pdf
+INPUT ./figures/decay_episodic_returns.pdf
+INPUT ./figures/decay_network_transfer.pdf
+INPUT ./figures/decay_network_transfer.pdf
+INPUT ./figures/decay_network_transfer.pdf
+INPUT ./figures/decay_network_transfer.pdf
+INPUT ./figures/decay_network_transfer.pdf
 INPUT /usr/local/texlive/2024/texmf-dist/fonts/vf/adobe/times/ptmri7t.vf
 INPUT /usr/local/texlive/2024/texmf-dist/fonts/tfm/adobe/times/ptmri8r.tfm
 INPUT report.aux

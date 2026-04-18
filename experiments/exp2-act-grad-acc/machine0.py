@@ -203,7 +203,8 @@ def main():
                     args.clip_vloss,
                     gradient_stats=use_gradient_stats,
                     accumulated_grads=use_accumulate_grads,
-                    accumulate_grads_percentile=args.accumulate_grads_percentile
+                    accumulate_grads_percentile=args.accumulate_grads_percentile,
+                    decay_buffer=args.decay_buffer
                 )
 
                 # Analyze feature_grads percentiles

@@ -1,6 +1,6 @@
 # Fdb version 4
-["pdflatex"] 1773016465.95128 "/Users/faizahmed/Documents/SJSU/CS297/pipeline-parallelism-rl/report/report.tex" "report.pdf" "report" 1773016466.42495 0
-  "/Users/faizahmed/Documents/SJSU/CS297/pipeline-parallelism-rl/report/report.tex" 1773016465.38174 22542 b75853cea04244847f04754d9079fff6 ""
+["pdflatex"] 1776140303.48255 "/Users/faizahmed/Documents/SJSU/CS297/pipeline-parallelism-rl/report/report.tex" "report.pdf" "report" 1776140304.00006 0
+  "/Users/faizahmed/Documents/SJSU/CS297/pipeline-parallelism-rl/report/report.tex" 1776140303.16288 26336 a24feb40c0334743bf9703d5a4bf7cd3 ""
   "/usr/local/texlive/2024/texmf-dist/fonts/enc/dvips/base/8r.enc" 1165713224 4850 80dc9bab7f31fb78a000ccfed0e27cab ""
   "/usr/local/texlive/2024/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "/usr/local/texlive/2024/texmf-dist/fonts/tfm/adobe/times/ptmb7t.tfm" 1136768653 2172 fd0c924230362ff848a33632ed45dc23 ""
@@ -84,11 +84,13 @@
   "/usr/local/texlive/2024/texmf-var/fonts/map/pdftex/updmap/pdftex.map" 1727768635.67795 5467645 128b85b7cde5f5edc5cb7f1dd7ff8736 ""
   "/usr/local/texlive/2024/texmf-var/web2c/pdftex/pdflatex.fmt" 1727768611 8221412 04c89ba4e1f6a9ec48d798131f3412a9 ""
   "/usr/local/texlive/2024/texmf.cnf" 1710266656 577 e590dabc9e28c5b61546e15f63eebcdf ""
-  "figures/episodic_returns.pdf" 1773016138.29684 33852 9b35f4e2c30a7a3009785ef5efa200f9 ""
-  "figures/network_transfer.pdf" 1773016138.44878 26842 f11d7d5f039296667ba46a960762d9e3 ""
+  "figures/decay_episodic_returns.pdf" 1776140285.73244 54831 f6346210e0ce3565ce6db0eb0d091848 ""
+  "figures/decay_network_transfer.pdf" 1776140285.92552 25053 de19fe7400cfd0d72d0b0fa653c7238a ""
+  "figures/episodic_returns.pdf" 1776140285.38182 33852 283644a22071b9f021890d6872844db6 ""
+  "figures/network_transfer.pdf" 1776140285.54375 26842 9a24c1c02555b246b0a08fdd6fbc1787 ""
   "figures/performance_comparison.pdf" 1773016335.31938 28473 014fed59552b986887d472dea66b85b1 ""
-  "report.aux" 1773016466.37198 3633 541b53b7a00e535b6a705df6e901dc07 "pdflatex"
-  "report.tex" 1773016465.38174 22542 b75853cea04244847f04754d9079fff6 ""
+  "report.aux" 1776140303.94304 4526 d773950be0a36cd904596f1c114b1b26 "pdflatex"
+  "report.tex" 1776140303.16288 26336 a24feb40c0334743bf9703d5a4bf7cd3 ""
   (generated)
   "report.aux"
   "report.log"
