@@ -187,7 +187,7 @@ def main():
                 
                 # Send features and loss components to machine1 for backward pass via RRef
                 # Machine1 will compute loss, backward, and return feature gradients
-                feature_grads, feature_grads_stats, relevant_grads_from_global_feature_grads, pg_loss_val, v_loss_val, entropy_loss_val = _remote_method(
+                feature_grads, feature_grads_stats, relevant_grads_from_global_feature_grads, pg_loss_val, v_loss_val, entropy_loss_val, buffer_stats = _remote_method(
                     ActorCriticNetwork.backward_and_step,
                     remote_actor_critic_network_rref,
                     cnn_features.detach(),
@@ -266,10 +266,31 @@ def main():
             # if args.target_kl is not None and approx_kl > args.target_kl:
             #     break
         
+        # Save gradient buffer snapshot every 3 iterations
+        if use_accumulate_grads and iteration % 3 == 0:
+            grad_buffer = _remote_method(
+                ActorCriticNetwork.get_global_feature_grads,
+                remote_actor_critic_network_rref
+            )
+            if grad_buffer is not None:
+                buffer_dir = f"/workspace/runs/{run_name}/grad_buffers/"
+                os.makedirs(buffer_dir, exist_ok=True)
+                torch.save(grad_buffer, f"{buffer_dir}iteration_{iteration}.pt")
+
         # Log training metrics
         writer.add_scalar("losses/value_loss", v_loss.item(), global_step)
         writer.add_scalar("losses/policy_loss", pg_loss.item(), global_step)
         writer.add_scalar("losses/entropy", entropy_loss.item(), global_step)
+
+        # Log buffer stats (from the last minibatch of the last epoch)
+        if buffer_stats is not None:
+            writer.add_scalar("buffer/mean_abs", buffer_stats['mean'], global_step)
+            writer.add_scalar("buffer/p10", buffer_stats['p10'], global_step)
+            writer.add_scalar("buffer/p25", buffer_stats['p25'], global_step)
+            writer.add_scalar("buffer/p50", buffer_stats['p50'], global_step)
+            writer.add_scalar("buffer/p90", buffer_stats['p90'], global_step)
+            writer.add_scalar("buffer/p99", buffer_stats['p99'], global_step)
+            writer.add_scalar("buffer/threshold", buffer_stats['threshold'], global_step)
 
         y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
         var_y = np.var(y_true)

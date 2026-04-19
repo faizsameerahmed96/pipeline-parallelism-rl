@@ -101,6 +101,12 @@ class ActorCriticNetwork(nn.Module):
         #     sample_input = torch.zeros(1, *envs.single_observation_space.shape)
         #     cnn_output_size = self.cnn(sample_input).shape[1]
 
+    def get_global_feature_grads(self):
+        """Return a copy of the gradient accumulation buffer."""
+        if self.global_feature_grads is None:
+            return None
+        return self.global_feature_grads.clone()
+
     def get_action_and_value(self, features, action=None, no_grad=False):
         if no_grad:
             with torch.no_grad():
@@ -195,17 +201,30 @@ class ActorCriticNetwork(nn.Module):
 
         feature_grads_stats = None
         relevant_grads_from_global_feature_grads = None # This will only contain the grads that are only over a certain percentile
-        
+        buffer_stats = None
+
         if accumulated_grads:
             # Accumulate gradients
             if self.global_feature_grads is None:
                 self.global_feature_grads = torch.zeros_like(feature_grads)
             self.global_feature_grads = self.global_feature_grads * decay_buffer + feature_grads
-            
+
             # Find 90th percentile of absolute gradient values from accumulated gradients
             abs_grads = torch.abs(self.global_feature_grads)
             grads_above_accumulate_grads_percentile = torch.quantile(abs_grads, accumulate_grads_percentile)
-            
+
+            # Buffer distribution stats for logging
+            abs_flat = abs_grads.flatten()
+            buffer_stats = {
+                'mean': abs_flat.mean().item(),
+                'p10': torch.quantile(abs_flat, 0.10).item(),
+                'p25': torch.quantile(abs_flat, 0.25).item(),
+                'p50': torch.quantile(abs_flat, 0.50).item(),
+                'p90': torch.quantile(abs_flat, 0.90).item(),
+                'p99': torch.quantile(abs_flat, 0.99).item(),
+                'threshold': grads_above_accumulate_grads_percentile.item(),
+            }
+
             # Create mask for values above 90th percentile
             mask = abs_grads >= grads_above_accumulate_grads_percentile
             
@@ -241,7 +260,7 @@ class ActorCriticNetwork(nn.Module):
         self.optimizer.step()
         
         # Return gradients and loss components for logging
-        return feature_grads, feature_grads_stats, relevant_grads_from_global_feature_grads, pg_loss.item(), v_loss.item(), entropy_loss.item()
+        return feature_grads, feature_grads_stats, relevant_grads_from_global_feature_grads, pg_loss.item(), v_loss.item(), entropy_loss.item(), buffer_stats
     
     def save_model(self, checkpoint_dir, iteration):
         """Save the ActorCriticNetwork model checkpoint."""
