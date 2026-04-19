@@ -17,17 +17,14 @@ ssh -p 40164 root@213.192.2.109 "tail -20 /tmp/training.log"
 
 ## Experiment 2 — Gradient Compression (accumulate-grads, 90p, decay=1.0)
 
-| Run ID | Config | Status | Server |
-|---|---|---|---|
-| TBD | accumulate-grads, 90p, decay=1.0 | PLANNED | — |
+| Run ID | Config | Status | Server | Port |
+|---|---|---|---|---|
+| `1776628684` | accumulate-grads, 90p, decay=1.0 | **RUNNING** | root@213.192.2.109:40164 | 29501 |
 
-Logs (new script uses port-based log files):
+Logs:
 ```bash
-# machine0 (master)
-ssh -p PORT root@HOST "tail -20 /tmp/machine0_MASTER_PORT.log"
-
-# machine1 (RPC worker)
-ssh -p PORT root@HOST "tail -20 /tmp/machine1_MASTER_PORT.log"
+ssh -p 40164 root@213.192.2.109 "tail -20 /tmp/machine0_29501.log"
+ssh -p 40164 root@213.192.2.109 "tail -20 /tmp/machine1_29501.log"
 ```
 
 ## General Tracking
