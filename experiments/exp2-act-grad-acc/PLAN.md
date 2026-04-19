@@ -27,6 +27,18 @@ ssh -p 40164 root@213.192.2.109 "tail -20 /tmp/machine0_29501.log"
 ssh -p 40164 root@213.192.2.109 "tail -20 /tmp/machine1_29501.log"
 ```
 
+## Experiment 3 — Gradient Compression with Decay (accumulate-grads, 90p, decay=0.99)
+
+| Run ID | Config | Status | Server | Port |
+|---|---|---|---|---|
+| `1776629538` | accumulate-grads, 90p, decay=0.99 | **RUNNING** | root@213.192.2.109:40164 | 29502 |
+
+Logs:
+```bash
+ssh -p 40164 root@213.192.2.109 "tail -20 /tmp/machine0_29502.log"
+ssh -p 40164 root@213.192.2.109 "tail -20 /tmp/machine1_29502.log"
+```
+
 ## General Tracking
 
 ```bash

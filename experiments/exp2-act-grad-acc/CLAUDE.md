@@ -16,6 +16,11 @@ Training requires a GPU server (tested on RTX 3090). Remote servers are rented a
 
 ### Start an experiment
 
+Before starting, check for already running experiments to avoid port conflicts:
+```bash
+ssh -p PORT root@HOST "pgrep -af 'python3.*machine[01].py'"
+```
+
 `run_experiment.sh` launches both RPC workers (machine0 + machine1) on a single machine. All `args.py` fields can be overridden via CLI flags.
 
 ```bash
