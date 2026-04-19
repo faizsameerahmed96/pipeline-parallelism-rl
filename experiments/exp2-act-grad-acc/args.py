@@ -12,7 +12,7 @@ class Args:
     total_timesteps: int = 1_000_000
     learning_rate: float = 0.00004
     num_envs: int = 8
-    num_steps: int = 4096
+    num_steps: int = 2048
     gamma: float = 0.99
     gae_lambda: float = 0.95
     num_minibatches: int = 32
