@@ -66,47 +66,62 @@ ssh -p PORT USER@HOST "cd ~/pipeline-parallelism-rl/experiments/exp2-act-grad-ac
 
 This installs system deps (`swig`, `build-essential`) and all Python packages. Safe to re-run — pip will skip already-installed packages.
 
-### 6. Start training
+### 6. Start training (detached) and background sync
+
+Start training detached on the remote so it survives SSH disconnects:
 
 ```bash
-ssh -p PORT USER@HOST "cd ~/pipeline-parallelism-rl/experiments/exp2-act-grad-acc && WANDB_API_KEY=7e17edaf69249508fbdf0464123047fd4b4d21ff bash run_experiment.sh EXTRA_ARGS"
+ssh -p PORT USER@HOST "cd ~/pipeline-parallelism-rl/experiments/exp2-act-grad-acc && nohup bash -c 'WANDB_API_KEY=7e17edaf69249508fbdf0464123047fd4b4d21ff bash run_experiment.sh EXTRA_ARGS' > /tmp/training.log 2>&1 &"
 ```
-
-Where `EXTRA_ARGS` are any extra arguments from `$ARGUMENTS` (e.g., `--cuda --total_timesteps 16384`).
 
 If no extra args were provided, default to `--cuda`:
 ```bash
-ssh -p PORT USER@HOST "cd ~/pipeline-parallelism-rl/experiments/exp2-act-grad-acc && WANDB_API_KEY=7e17edaf69249508fbdf0464123047fd4b4d21ff bash run_experiment.sh --cuda"
+ssh -p PORT USER@HOST "cd ~/pipeline-parallelism-rl/experiments/exp2-act-grad-acc && nohup bash -c 'WANDB_API_KEY=7e17edaf69249508fbdf0464123047fd4b4d21ff bash run_experiment.sh --cuda' > /tmp/training.log 2>&1 &"
 ```
 
-`run_experiment.sh` handles:
-- Killing any previous training processes
-- Starting machine1 (RPC worker) in background
-- Starting machine0 (master) in foreground with `tee` to `/tmp/machine0.log`
-- Cleaning up machine1 when machine0 finishes
+Wait a few seconds, then verify training started:
+```bash
+ssh -p PORT USER@HOST "pgrep -af 'python3.*machine[01].py'"
+```
 
-**IMPORTANT:** Training is complete when you see "Machine shutting down" in the output. machine0 sleeps for 1000 seconds after that message. Once you see it, Ctrl+C the SSH session and proceed to step 7.
+Start a **background rsync loop** that syncs results every 30 seconds:
+
+```bash
+while true; do rsync -avz --quiet -e "ssh -p PORT" USER@HOST:~/pipeline-parallelism-rl/experiments/exp2-act-grad-acc/runs/ /Users/faizahmed/Documents/SJSU/CS297/pipeline-parallelism-rl/experiments/exp2-act-grad-acc/runs/ 2>/dev/null; sleep 30; done
+```
+
+Run this with `run_in_background: true` so it syncs continuously while training runs.
+
+### 7. Monitor training
+
+Tail the remote log to watch progress:
+
+```bash
+ssh -p PORT USER@HOST "tail -f /tmp/training.log"
+```
+
+**IMPORTANT:** Training is complete when you see "Machine shutting down" in the logs. machine0 sleeps for 1000 seconds after that message. Once you see it, proceed to step 8.
 
 If SSH disconnects, check if training is still running:
 ```bash
 ssh -p PORT USER@HOST "pgrep -af 'python3.*machine[01].py'"
 ```
 
-To view logs after disconnect:
+To view recent logs after disconnect:
 ```bash
-ssh -p PORT USER@HOST "tail -100 /tmp/machine0.log"
+ssh -p PORT USER@HOST "tail -100 /tmp/training.log"
 ```
-
-### 7. Sync results to local
-
-```bash
-rsync -avz -e "ssh -p PORT" USER@HOST:~/pipeline-parallelism-rl/experiments/exp2-act-grad-acc/runs/ /Users/faizahmed/Documents/SJSU/CS297/pipeline-parallelism-rl/experiments/exp2-act-grad-acc/runs/
-```
-
-Report what was synced (model checkpoints, grad buffers, logs).
 
 ### 8. Cleanup
 
+Once training is complete:
+
+1. Kill the background rsync loop (stop the background Bash command).
+2. Do one final rsync to ensure everything is synced:
+```bash
+rsync -avz -e "ssh -p PORT" USER@HOST:~/pipeline-parallelism-rl/experiments/exp2-act-grad-acc/runs/ /Users/faizahmed/Documents/SJSU/CS297/pipeline-parallelism-rl/experiments/exp2-act-grad-acc/runs/
+```
+3. Kill remote training processes:
 ```bash
 ssh -p PORT USER@HOST "pkill -f 'python3.*machine[01].py'" 2>/dev/null || true
 ```
