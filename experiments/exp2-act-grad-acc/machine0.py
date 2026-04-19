@@ -45,7 +45,7 @@ def main():
 
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
 
-    envs = gym.vector.SyncVectorEnv(
+    envs = gym.vector.AsyncVectorEnv(
         [
             make_env(args.env_id, i, False, run_name, args.gamma)
             for i in range(args.num_envs)
@@ -92,27 +92,38 @@ def main():
             save_checkpoint(args, iteration, run_name, cnn_network, remote_actor_critic_network_rref)
 
         # Rollout
+        rollout_start = time.time()
+        rollout_cnn_time = 0
+        rollout_rpc_time = 0
+        rollout_env_time = 0
         for step in range(0, args.num_steps):
             global_step += args.num_envs
             obs[step] = next_obs
             dones[step] = next_done
 
             with torch.no_grad():
+                t0 = time.time()
                 cnn_features = cnn_network(next_obs)
+                rollout_cnn_time += time.time() - t0
+
+                t0 = time.time()
                 action, logprob, _, value = _remote_method(
                     ActorCriticNetwork.get_action_and_value,
                     remote_actor_critic_network_rref,
                     cnn_features,
                     no_grad=True
                 )
+                rollout_rpc_time += time.time() - t0
                 values[step] = value.flatten()
 
             actions[step] = action
             logprobs[step] = logprob
 
+            t0 = time.time()
             next_obs, reward, terminations, truncations, infos = envs.step(
                 action.cpu().numpy()
             )
+            rollout_env_time += time.time() - t0
             next_done = np.logical_or(terminations, truncations)
             rewards[step] = torch.tensor(reward).to(device).view(-1)
             next_obs, next_done = torch.Tensor(next_obs).to(device), torch.Tensor(
@@ -129,6 +140,8 @@ def main():
                     "charts/episodic_return", ep_infos["r"][0], global_step
                 )
 
+        rollout_time = time.time() - rollout_start
+        print(f"ROLLOUT: {rollout_time:.2f}s (cnn: {rollout_cnn_time:.2f}s, rpc: {rollout_rpc_time:.2f}s, env: {rollout_env_time:.2f}s)", flush=True)
         print("BOOTSTRAPPING")
         # bootstrap value if not done
         with torch.no_grad():
@@ -171,6 +184,12 @@ def main():
         v_loss = torch.tensor(0.0)
         entropy_loss = torch.tensor(0.0)
 
+        gae_time = time.time() - rollout_start - rollout_time
+        print(f"GAE: {gae_time:.2f}s", flush=True)
+        update_start = time.time()
+        update_cnn_time = 0
+        update_rpc_time = 0
+        update_backward_time = 0
         print("UPDATING THE N/W")
         for epoch in range(args.update_epochs):
             np.random.shuffle(b_inds)
@@ -179,7 +198,9 @@ def main():
                 mb_inds = b_inds[start:end]
 
                 # Forward pass through CNN with gradients enabled
+                t0 = time.time()
                 cnn_features = cnn_network(b_obs[mb_inds])
+                update_cnn_time += time.time() - t0
                 
                 # Determine whether to use gradient statistics based on warm start
                 use_gradient_stats = args.gradient_compression_technique == 'stats' and global_step >= args.warm_start_steps
@@ -187,6 +208,7 @@ def main():
                 
                 # Send features and loss components to machine1 for backward pass via RRef
                 # Machine1 will compute loss, backward, and return feature gradients
+                t0 = time.time()
                 feature_grads, feature_grads_stats, relevant_grads_from_global_feature_grads, pg_loss_val, v_loss_val, entropy_loss_val, buffer_stats = _remote_method(
                     ActorCriticNetwork.backward_and_step,
                     remote_actor_critic_network_rref,
@@ -206,6 +228,7 @@ def main():
                     accumulate_grads_percentile=args.accumulate_grads_percentile,
                     decay_buffer=args.decay_buffer
                 )
+                update_rpc_time += time.time() - t0
 
                 # Analyze feature_grads percentiles
                 # if feature_grads is not None:
@@ -251,13 +274,15 @@ def main():
                     feature_grads[indices[:, 0], indices[:, 1]] = values
 
                 
+                t0 = time.time()
                 optimizer.zero_grad()
                 cnn_features.backward(feature_grads)
-                
+
                 nn.utils.clip_grad_norm_(cnn_network.parameters(), args.max_grad_norm)
-                
+
                 # Optimizer step for CNN network
                 optimizer.step()
+                update_backward_time += time.time() - t0
                 
                 pg_loss = torch.tensor(pg_loss_val)
                 v_loss = torch.tensor(v_loss_val)
@@ -266,6 +291,12 @@ def main():
             # if args.target_kl is not None and approx_kl > args.target_kl:
             #     break
         
+        update_time = time.time() - update_start
+        print(f"UPDATE: {update_time:.2f}s (cnn: {update_cnn_time:.2f}s, rpc: {update_rpc_time:.2f}s, backward: {update_backward_time:.2f}s)", flush=True)
+        writer.add_scalar("timing/rollout_s", rollout_time, global_step)
+        writer.add_scalar("timing/gae_s", gae_time, global_step)
+        writer.add_scalar("timing/update_s", update_time, global_step)
+
         # Save gradient buffer snapshot every 3 iterations
         if use_accumulate_grads and iteration % 3 == 0:
             grad_buffer = _remote_method(
