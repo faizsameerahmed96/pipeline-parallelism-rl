@@ -1,0 +1,41 @@
+\chapter{Evaluation Results}
+
+We evaluate our gradient accumulation approach across four configurations over 723,000 training steps on CarRacing-v3: (1) baseline pipeline parallelism without compression, (2) 90th percentile sparsification, (3) 90th percentile with 0.99 buffer decay, and (4) 90th percentile with 0.95 buffer decay. Episodic returns are smoothed using exponential moving average (EMA) with decay 0.9.
+
+\section{Training Performance}
+
+Figure~\ref{fig:returns} shows training performance. The vertical dashed line marks the warm start boundary at 30,000 steps. The baseline without compression continues improving throughout training, reaching an EMA return of 760 by 723,000 steps. The 90th percentile configuration without decay tracks the baseline initially but gradually diverges, reaching an EMA return of 288 at 723,000 steps. Both decay variants peak earlier---the 0.95 decay around 250,000 steps and the 0.99 decay around 350,000 steps---then degrade, ending at EMA returns of 85 and $-17$ respectively.
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\textwidth]{images/episodic_returns.pdf}}
+\caption{Training performance comparison over 723,000 steps. The baseline continues improving throughout training. The 90th percentile without decay diverges gradually. Both decay variants ($\lambda = 0.99, 0.95$) peak early then degrade. The dashed vertical line indicates warm start completion at 30,000 steps.}
+\label{fig:returns}
+\end{figure}
+
+\section{Communication Overhead}
+
+Figure~\ref{fig:network} presents cumulative data transfer. The baseline transmits 242~GB over 723,000 steps. All three 90th percentile configurations---with and without decay---transfer approximately 157~GB, achieving a 35\% reduction (85~GB saved). The decay factor does not affect communication volume since the same percentile threshold determines what is transmitted; it only affects the magnitude of retained gradients.
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\textwidth]{images/network_transfer.pdf}}
+\caption{Cumulative network transfer comparison. All 90th percentile configurations achieve identical 35\% bandwidth reduction regardless of decay factor, saving 85~GB over 723,000 training steps.}
+\label{fig:network}
+\end{figure}
+
+\section{Buffer Decay Analysis}
+
+The decay variants were motivated by a concern that below-threshold gradients persisting indefinitely in the accumulator may become stale as the policy evolves. We apply an exponential decay factor $\lambda$ to the accumulator before adding new gradients each minibatch, discounting older unsent values.
+
+However, the decay interacts poorly with the per-minibatch accumulation schedule. With 32 minibatches per epoch and 10 update epochs, the decay is applied 320 times per training iteration. At $\lambda = 0.95$, retained gradients are scaled by $0.95^{320} \approx 7.5 \times 10^{-8}$ after one iteration---effectively zeroing out any gradient that does not exceed the percentile threshold within a single iteration. At $\lambda = 0.99$, the retention factor is $0.99^{320} \approx 0.04$, which is less aggressive but still substantial. In both cases, the decay prevents below-threshold gradients from accumulating to significance, reducing the gradient signal available to the CNN feature extractor and causing performance to degrade after an initial peak.
+
+These results indicate that multiplicative buffer decay is counterproductive when applied at the minibatch granularity. The percentile-based sparsification already manages the accumulator by zeroing out transmitted values; adding decay on top removes gradient signal before it can accumulate to the transmission threshold.
+
+\section{Policy Evaluation}
+
+To further characterize final policy quality, we evaluated trained checkpoints over 100 independent environment episodes with a fixed random seed. Each checkpoint was loaded after training completed and rolled out in CarRacing-v3 without any further updates. Figure~\ref{fig:boxplot} shows box plots of episodic returns for the baseline and 90th percentile configurations. The baseline achieves a mean return of 398.97 ($\pm$226.58) with a median of 376.68, while gradient accumulation achieves a mean of 305.32 ($\pm$161.73) with a median of 283.18. The interquartile ranges substantially overlap---the gradient accumulation Q1--Q3 range of [190, 416] versus the baseline range of [284, 520]---and the 90th percentile model achieves 76.5\% of baseline mean performance. The tighter standard deviation under compression (161.73 vs.\ 226.58) suggests the compressed model produces more consistent, if somewhat lower, returns.
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\textwidth]{images/performance_comparison.pdf}}
+\caption{Evaluation return distributions over 100 independent episodes per checkpoint (no further training). Box plots show median, IQR, and whiskers (1.5$\times$IQR). Gradient accumulation (90th percentile) achieves 76.5\% of baseline mean return with overlapping IQRs.}
+\label{fig:boxplot}
+\end{figure}

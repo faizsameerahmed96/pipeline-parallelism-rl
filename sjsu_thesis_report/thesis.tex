@@ -1,0 +1,142 @@
+%
+%
+% SJSU Thesis/Project Report
+%
+% Abstract, acknowledgements, chapters, appendices, and references are in separate tex files
+%
+%
+\documentclass[simpleref]{urithesis}
+\usepackage{amsmath,amsthm, amsfonts, amssymb, amsxtra,amsopn}
+\usepackage{graphicx}
+\usepackage{multirow}
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{cmap}
+\PassOptionsToPackage{hyphens}{url}
+\usepackage{xcolor, colortbl}
+\usepackage[T1]{fontenc}
+\usepackage{textcomp}
+\usepackage{listings}
+\usepackage{microtype}
+\usepackage{pgfplots}
+\usepackage{makecell}
+\usepackage[shortcuts]{extdash}
+
+% Do not add extra space around itemizes
+\usepackage{enumitem}
+\setlist[itemize]{noitemsep, topsep=0pt}
+
+\usepackage{algorithm}
+\usepackage[noend]{algpseudocode}
+
+\usepackage{mdframed}
+\usepackage{array}
+\usepackage[export]{adjustbox}
+
+\usepackage{hyperref}
+\hypersetup{hidelinks}
+
+\usepackage[tableposition=top]{caption}
+\usepackage[vmargin={1.25in, 1.25in}, hmargin={1.5in, 1in},
+            textwidth=6in,
+            textheight=5.25in]{geometry}
+\usepackage{microtype}
+\DisableLigatures{encoding = *, family = * }
+
+% no limit on percentage of floats per page
+\renewcommand{\floatpagefraction}{1.0}
+\renewcommand{\topfraction}{1.0}
+\renewcommand{\textfraction}{0.0}
+
+% Prevent hyphenation in the TOC, List of Figures, and List of Tables
+\makeatletter
+\renewcommand{\@tocrmarg}{2.3em plus1fil}
+\makeatother
+
+% eref puts parenthesis around reference, like "equation (1)"
+\def\eref#1{(\ref{#1})}
+
+%
+% Project type: For CS 298 use "Project", for CS 299 use "Thesis"
+%
+\def\projectType{Project}
+%
+% Graduation month
+%
+\def\graduationMonth{May}
+%
+% Advisor's name
+%
+\def\advisorName{Dr. Genya Ishigaki}
+\def\advisorAffiliation{Department of Computer Science}
+%
+% First committee member's name
+%
+\def\firstCommitteeMember{Committee Member 1}
+\def\firstCommitteeMemberAffiliation{Department of Computer Science}
+%
+% Second committee member's name
+%
+\def\secondCommitteeMember{Committee Member 2}
+\def\secondCommitteeMemberAffiliation{Department of Computer Science}
+
+\setcounter{secnumdepth}{3}
+
+\begin{document}
+
+%
+% Title
+%
+\title{Efficient Pipeline Parallelism for Reinforcement Learning}
+
+%
+% Author
+%
+\author{Faiz Sameer Ahmed}
+%
+% Graduation year
+%
+\copyrightyear{2025}
+
+%
+% Do not change this...
+%
+\ifthenelse{\equal{\projectType}{Thesis}}
+           {\raggedright \parindent=30pt}
+           {}
+
+\pagestyle{empty}
+
+%
+% Abstract
+%
+\abstract{abs}
+
+%
+% Acknowledgements
+%
+\acknowledgements{ack}
+
+\setlength{\parskip}{.1 in}
+%uncomment the following for single space drafts
+%\singlespace
+\doublespace
+\pagenumbering{arabic}
+
+\setcounter{page}{0}
+
+%
+% Chapters
+%
+\newchapter{chap1}
+\newchapter{chap2}
+\newchapter{chap3}
+\newchapter{chap4}
+\newchapter{chap5}
+
+%
+% References
+%
+\reffile{references}
+
+\end{document}
