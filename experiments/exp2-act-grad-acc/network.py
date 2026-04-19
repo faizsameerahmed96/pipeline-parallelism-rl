@@ -97,6 +97,10 @@ class ActorCriticNetwork(nn.Module):
         # Initialize global feature gradient accumulator
         self.global_feature_grads = None
 
+        # Move to GPU if available
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.to(self.device)
+
         # with torch.no_grad():
         #     sample_input = torch.zeros(1, *envs.single_observation_space.shape)
         #     cnn_output_size = self.cnn(sample_input).shape[1]

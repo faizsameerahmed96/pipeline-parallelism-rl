@@ -1,0 +1,51 @@
+services:
+  machine0:
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu
+    command: machine0.py --cuda
+    volumes:
+      - ./runs:/workspace/runs
+    environment:
+      - RANK=0
+      - WORLD_SIZE=2
+      - MASTER_ADDR=machine0
+      - MASTER_PORT=29500
+      - WANDB_API_KEY=${WANDB_API_KEY}
+    networks:
+      - net
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  machine1:
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu
+    command: machine1.py
+    depends_on:
+      - machine0
+    volumes:
+      - ./runs:/workspace/runs
+    environment:
+      - RANK=1
+      - WORLD_SIZE=2
+      - MASTER_ADDR=machine0
+      - MASTER_PORT=29500
+    networks:
+      - net
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+networks:
+  net:
+    driver: bridge
