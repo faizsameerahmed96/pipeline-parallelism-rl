@@ -33,8 +33,12 @@ def setup():
     torch.cuda.manual_seed_all(seed)
     torch.use_deterministic_algorithms(True)
     
+    options = rpc.TensorPipeRpcBackendOptions()
+    if torch.cuda.is_available():
+        options.set_device_map("worker0", {0: 0})
     rpc.init_rpc(
-        name=f"worker{rank}", rank=rank, world_size=int(os.environ["WORLD_SIZE"])
+        name=f"worker{rank}", rank=rank, world_size=int(os.environ["WORLD_SIZE"]),
+        rpc_backend_options=options
     )
     print("RPC initialized successfully.", flush=True)
 
