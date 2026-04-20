@@ -52,3 +52,4 @@ WANDB_API_KEY: `7e17edaf69249508fbdf0464123047fd4b4d21ff`
 - Only `num_envs=1, num_steps=4096` has been proven to work well. Other num_envs/num_steps combos underperformed — do not change without re-tuning.
 - Decay buffer is applied `num_steps/minibatch_size * update_epochs` times per iteration (e.g., 320x). Even 0.99 decay is aggressive.
 - `warm_start_steps=30000` — gradient compression only activates after this many steps.
+- Max 2 concurrent experiments per RTX 3090 (3 causes CUDA OOM).

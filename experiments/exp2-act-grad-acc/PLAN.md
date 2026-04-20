@@ -8,7 +8,7 @@
 
 | Run ID | Config | Status | Server |
 |---|---|---|---|
-| `1776624639` | No compression | **RUNNING** | root@213.192.2.109:40164 |
+| `1776624639` | No compression | **CRASHED iter 169/244 (NaN in policy)** | root@213.192.2.109:40164 |
 
 Logs (started with old script):
 ```bash
@@ -31,7 +31,8 @@ ssh -p 40164 root@213.192.2.109 "tail -20 /tmp/machine1_29501.log"
 
 | Run ID | Config | Status | Server | Port |
 |---|---|---|---|---|
-| `1776629538` | accumulate-grads, 90p, decay=0.99 | **RUNNING** | root@213.192.2.109:40164 | 29502 |
+| `1776629538` | accumulate-grads, 90p, decay=0.99 | OOM at iter 10 | root@213.192.2.109:40164 | 29502 |
+| `1776636519` | accumulate-grads, 90p, decay=0.99 | **RUNNING** | root@213.192.2.109:40164 | 29502 |
 
 Logs:
 ```bash
