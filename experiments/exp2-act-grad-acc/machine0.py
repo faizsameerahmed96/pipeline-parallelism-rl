@@ -27,6 +27,18 @@ def _remote_method(method, rref, *args, **kwargs):
     owner = rref.owner()
     return rpc.rpc_sync(owner, _call_method, args=(method, rref, *args), kwargs=kwargs)
 
+def _tensor_bytes(t):
+    """Calculate byte size of a tensor, dict of tensors, or tuple/list of tensors."""
+    if t is None:
+        return 0
+    if isinstance(t, torch.Tensor):
+        return t.nelement() * t.element_size()
+    if isinstance(t, dict):
+        return sum(_tensor_bytes(v) for v in t.values())
+    if isinstance(t, (tuple, list)):
+        return sum(_tensor_bytes(v) for v in t)
+    return 0
+
 
 def main():
     args = get_args()
@@ -83,6 +95,10 @@ def main():
     net_io_start = psutil.net_io_counters()
     bytes_start = net_io_start.bytes_sent + net_io_start.bytes_recv
 
+    # Track calculated data transfer (application-level)
+    calculated_bytes_sent = 0  # machine0 → machine1
+    calculated_bytes_recv = 0  # machine1 → machine0
+
     # Resume training from the checkpoint iteration
     for iteration in range(start_iteration, args.num_iterations + 1):
         print(f"Iteration {iteration}/{args.num_iterations}", flush=True)
@@ -114,6 +130,8 @@ def main():
                     no_grad=True
                 )
                 rollout_rpc_time += time.time() - t0
+                calculated_bytes_sent += _tensor_bytes(cnn_features)
+                calculated_bytes_recv += _tensor_bytes((action, logprob, value))
                 values[step] = value.flatten()
 
             actions[step] = action
@@ -149,6 +167,8 @@ def main():
             next_value = _remote_method(
                 ActorCriticNetwork.get_value, remote_actor_critic_network_rref, cnn_features, no_grad=True
             )
+            calculated_bytes_sent += _tensor_bytes(cnn_features)
+            calculated_bytes_recv += _tensor_bytes(next_value)
             next_value = next_value.reshape(1, -1)
             advantages = torch.zeros_like(rewards).to(device)
             lastgaelam = 0
@@ -229,6 +249,8 @@ def main():
                     decay_buffer=args.decay_buffer
                 )
                 update_rpc_time += time.time() - t0
+                calculated_bytes_sent += _tensor_bytes((cnn_features, b_actions[mb_inds], b_logprobs[mb_inds], b_advantages[mb_inds], b_returns[mb_inds], b_values[mb_inds]))
+                calculated_bytes_recv += _tensor_bytes((feature_grads, feature_grads_stats, relevant_grads_from_global_feature_grads))
 
                 # Analyze feature_grads percentiles
                 # if feature_grads is not None:
@@ -341,6 +363,9 @@ def main():
         bytes_current = net_io_current.bytes_sent + net_io_current.bytes_recv
         total_transfer_mb = (bytes_current - bytes_start) / (1024 * 1024)
         writer.add_scalar("charts/network_transfer_in_mb", total_transfer_mb, global_step)
+
+        # Track calculated data transfer (application-level)
+        writer.add_scalar("charts/calculated_data_transfer_total_mb", (calculated_bytes_sent + calculated_bytes_recv) / (1024 * 1024), global_step)
         
 
     # Save final checkpoint at the end of training
