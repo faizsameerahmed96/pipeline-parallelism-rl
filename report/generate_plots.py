@@ -170,3 +170,54 @@ for name, col in [('No Compression', decay_none_data), ('90th Percentile', decay
         print(f"{name}: cumulative transfer = {val:.2f} GB")
 
 plt.close('all')
+
+# ============================================================
+# Data 4: New experiment runs (3 configurations, returns only)
+# ============================================================
+exp4_df = pd.read_csv('data_4/wandb_export_2026-04-24T00_31_24.510-07_00.csv')
+
+exp4_none = '1776624639-grad-compression=none - charts/episodic_return'
+exp4_p90 = '1776628684-grad-compression=accumulate-grads - charts/episodic_return'
+exp4_p90_decay = '1776636519-grad-compression=accumulate-grads - charts/episodic_return'
+
+# Cut to shortest run (~692k steps for baseline)
+EXP4_MAX_STEP = 691990
+exp4_cut = exp4_df[exp4_df['global_step'] <= EXP4_MAX_STEP].copy()
+
+exp4_cut['none_smooth'] = smooth_series(exp4_cut, exp4_none)
+exp4_cut['p90_smooth'] = smooth_series(exp4_cut, exp4_p90)
+exp4_cut['p90_decay_smooth'] = smooth_series(exp4_cut, exp4_p90_decay)
+
+# Figure: Episodic Returns (3 configurations)
+fig, ax = plt.subplots(figsize=(7, 4))
+
+ax.plot(exp4_cut['global_step'], exp4_cut['none_smooth'],
+        color=colors['red'], linewidth=1.5, label='No Compression', alpha=0.9)
+ax.plot(exp4_cut['global_step'], exp4_cut['p90_smooth'],
+        color=colors['blue'], linewidth=1.5, label='90th Percentile', alpha=0.9)
+ax.plot(exp4_cut['global_step'], exp4_cut['p90_decay_smooth'],
+        color=colors['orange'], linewidth=1.5, label='90th Percentile + 0.99 Decay', alpha=0.9)
+
+ax.axvline(x=30000, color='black', linestyle='--', linewidth=1,
+           label='Warm Start End', alpha=0.6)
+
+ax.set_xlabel('Training Steps', fontsize=11)
+ax.set_ylabel('Episodic Return (EMA)', fontsize=11)
+ax.set_title('Training Performance Comparison (Concurrent Runs)', fontsize=12, fontweight='bold')
+ax.legend(loc='upper left', frameon=True, fancybox=True, shadow=True)
+ax.grid(True, alpha=0.3, linestyle=':')
+ax.set_xlim(0, EXP4_MAX_STEP)
+
+plt.tight_layout()
+plt.savefig('figures/exp4_episodic_returns.pdf', bbox_inches='tight', dpi=300)
+plt.savefig('figures/exp4_episodic_returns.png', bbox_inches='tight', dpi=300)
+print("Saved exp4_episodic_returns.pdf and exp4_episodic_returns.png")
+
+# Statistics
+print("\n=== Exp4 Final Statistics ===")
+for name, col in [('No Compression', 'none_smooth'), ('90th Percentile', 'p90_smooth'),
+                   ('90p + 0.99 Decay', 'p90_decay_smooth')]:
+    val = exp4_cut[col].dropna().iloc[-1]
+    print(f"{name}: final EMA return = {val:.2f}")
+
+plt.close('all')

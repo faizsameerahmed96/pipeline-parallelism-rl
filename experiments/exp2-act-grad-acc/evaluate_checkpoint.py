@@ -62,7 +62,8 @@ def evaluate_checkpoint(args: EvalArgs) -> List[float]:
     
     # Load ActorCritic network locally
     actor_critic_network = ActorCriticNetwork().to(device)
-    actor_critic_network.load_model(args.actor_critic_checkpoint_path)
+    ac_checkpoint = torch.load(args.actor_critic_checkpoint_path, map_location=device)
+    actor_critic_network.load_state_dict(ac_checkpoint['model_state_dict'])
     actor_critic_network.eval()
     
     episodic_returns = []

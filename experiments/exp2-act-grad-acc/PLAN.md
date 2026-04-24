@@ -55,7 +55,7 @@ ssh -p 40092 root@213.192.2.86 "tail -20 /tmp/machine0_29500.log"
 
 | Run ID | Config | Status | Server | Port |
 |---|---|---|---|---|
-| `1776998261` | accumulate-grads, 90p, decay=1.0, total_timesteps=750000 | **RUNNING** | root@213.192.2.86:40092 | 29500 |
+| `1776998261` | accumulate-grads, 90p, decay=1.0, total_timesteps=750000 | **COMPLETED** | root@213.192.2.86:40092 | 29500 |
 
 Logs:
 ```bash
@@ -66,7 +66,7 @@ ssh -p 40092 root@213.192.2.86 "tail -20 /tmp/machine0_29500.log"
 
 | Run ID | Config | Status | Server | Port |
 |---|---|---|---|---|
-| `1777001996` | accumulate-grads, 90p, decay=0.99, total_timesteps=750000 | **RUNNING** | root@213.192.2.86:40092 | 29501 |
+| `1777001996` | accumulate-grads, 90p, decay=0.99, total_timesteps=750000 | **COMPLETED** | root@213.192.2.86:40092 | 29501 |
 
 Logs:
 ```bash
