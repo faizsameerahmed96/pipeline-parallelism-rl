@@ -99,6 +99,11 @@ def main():
     calculated_bytes_sent = 0  # machine0 → machine1
     calculated_bytes_recv = 0  # machine1 → machine0
 
+    # Local state for surprise compression
+    local_running_mean = None
+    local_running_std = None
+    surprise_minibatch_counter = 0
+
     # Resume training from the checkpoint iteration
     for iteration in range(start_iteration, args.num_iterations + 1):
         print(f"Iteration {iteration}/{args.num_iterations}", flush=True)
@@ -225,6 +230,8 @@ def main():
                 # Determine whether to use gradient statistics based on warm start
                 use_gradient_stats = args.gradient_compression_technique == 'stats' and global_step >= args.warm_start_steps
                 use_accumulate_grads = args.gradient_compression_technique == 'accumulate-grads' and global_step >= args.warm_start_steps
+                use_surprise = args.gradient_compression_technique == 'surprise' and global_step >= args.warm_start_steps
+                surprise_warmup = args.gradient_compression_technique == 'surprise' and global_step < args.warm_start_steps
                 
                 # Send features and loss components to machine1 for backward pass via RRef
                 # Machine1 will compute loss, backward, and return feature gradients
@@ -246,7 +253,13 @@ def main():
                     gradient_stats=use_gradient_stats,
                     accumulated_grads=use_accumulate_grads,
                     accumulate_grads_percentile=args.accumulate_grads_percentile,
-                    decay_buffer=args.decay_buffer
+                    decay_buffer=args.decay_buffer,
+                    surprise_compress=use_surprise,
+                    surprise_compress_percentile=args.surprise_compress_percentile,
+                    surprise_compress_ema_alpha=args.surprise_compress_ema_alpha,
+                    surprise_sync_interval=args.surprise_sync_interval,
+                    surprise_minibatch_counter=surprise_minibatch_counter,
+                    surprise_warmup=surprise_warmup
                 )
                 update_rpc_time += time.time() - t0
                 calculated_bytes_sent += _tensor_bytes((cnn_features, b_actions[mb_inds], b_logprobs[mb_inds], b_advantages[mb_inds], b_returns[mb_inds], b_values[mb_inds]))
@@ -281,19 +294,34 @@ def main():
                     minibatch_size = cnn_features.shape[0]
                     feature_grads = torch.randn(minibatch_size, grad_mean.shape[1], device=device) * grad_std + grad_mean
                 
-                # Reconstruct sparse gradients if accumulated_grads was used
+                # Reconstruct sparse gradients
                 if relevant_grads_from_global_feature_grads is not None:
-                    # Extract sparse gradient data
-                    indices = relevant_grads_from_global_feature_grads['indices'].long()  # (num_elements, 2)
-                    values = relevant_grads_from_global_feature_grads['values']    # (num_elements,)
-                    shape = relevant_grads_from_global_feature_grads['shape']      # Original shape
-                    
-                    # Create zero tensor with original shape
-                    feature_grads = torch.zeros(shape, device=device)
-                    
-                    # Fill in the sparse values at their corresponding indices
-                    # indices[:, 0] are row indices, indices[:, 1] are column indices
-                    feature_grads[indices[:, 0], indices[:, 1]] = values
+                    sparse_data = relevant_grads_from_global_feature_grads
+                    indices = sparse_data['indices'].long()
+                    values = sparse_data['values']
+                    shape = sparse_data['shape']
+
+                    if sparse_data.get('technique') == 'surprise':
+                        # Update local stats if synced
+                        if 'running_mean' in sparse_data:
+                            local_running_mean = sparse_data['running_mean'].to(device)
+                            local_running_std = sparse_data['running_std'].to(device)
+
+                        # Reconstruct: sample from N(μ, σ) then overwrite sent positions
+                        minibatch_size = cnn_features.shape[0]
+                        if local_running_mean is not None:
+                            feature_grads = torch.randn(minibatch_size, local_running_mean.shape[0], device=device) * local_running_std + local_running_mean
+                        else:
+                            feature_grads = torch.zeros(shape, device=device)
+
+                        # Overwrite with actual gradient values at sent positions
+                        feature_grads[indices[:, 0], indices[:, 1]] = values
+
+                        surprise_minibatch_counter += 1
+                    else:
+                        # Accumulate-grads reconstruction: zero-fill + scatter
+                        feature_grads = torch.zeros(shape, device=device)
+                        feature_grads[indices[:, 0], indices[:, 1]] = values
 
                 
                 t0 = time.time()
@@ -337,13 +365,8 @@ def main():
 
         # Log buffer stats (from the last minibatch of the last epoch)
         if buffer_stats is not None:
-            writer.add_scalar("buffer/mean_abs", buffer_stats['mean'], global_step)
-            writer.add_scalar("buffer/p10", buffer_stats['p10'], global_step)
-            writer.add_scalar("buffer/p25", buffer_stats['p25'], global_step)
-            writer.add_scalar("buffer/p50", buffer_stats['p50'], global_step)
-            writer.add_scalar("buffer/p90", buffer_stats['p90'], global_step)
-            writer.add_scalar("buffer/p99", buffer_stats['p99'], global_step)
-            writer.add_scalar("buffer/threshold", buffer_stats['threshold'], global_step)
+            for key, val in buffer_stats.items():
+                writer.add_scalar(f"buffer/{key}", val, global_step)
 
         y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
         var_y = np.var(y_true)

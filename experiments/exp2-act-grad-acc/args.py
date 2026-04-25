@@ -34,10 +34,15 @@ class Args:
     wandb_project: str = "data-paralellism-rl-2026-02"
 
     # Compression related args
-    gradient_compression_technique: str | None = 'accumulate-grads' # 'stats', 'accumulate-grads'
+    gradient_compression_technique: str | None = 'accumulate-grads' # 'stats', 'accumulate-grads', 'surprise'
     accumulate_grads_percentile: float | None = 0.90
     decay_buffer: float = 0.95 # Decay factor for accumulated gradients buffer (1.0 = no decay)
     warm_start_steps: int = 30_000 # Number of steps before starting compression
+
+    # Surprise compression technique args (used with gradient_compression_technique='surprise')
+    surprise_compress_percentile: float = 0.90 # Send top 10% most surprising gradients by z-score
+    surprise_compress_ema_alpha: float = 0.5 # EMA alpha for running stats (0.5 = equal weight on history and current gradient)
+    surprise_sync_interval: int = 10 # Sync running stats to machine0 every N minibatches
 
     # to be filled in runtime
     batch_size: int = 0
