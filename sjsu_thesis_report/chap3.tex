@@ -16,7 +16,7 @@ We compare data transfer requirements across two deployment scenarios over 100 t
 100 \times 10 \times 32 \times 128 \times 4096 \times 2 = 32.7\text{B tensors} \approx 66\text{ GB}
 \end{equation}
 
-The factor of 2 accounts for bidirectional communication (forward activations and backward gradients). While cloud setup requires 28~GB, pipeline parallelism requires 66~GB---a 2.4$\times$ increase. Table~\ref{tab:data_transfer} summarizes this comparison.
+The factor of 2 accounts for bidirectional communication (forward activations and backward gradients). While cloud setup requires 28~GB, pipeline parallelism requires 66~GB, a 2.4$\times$ increase. Table~\ref{tab:data_transfer} summarizes this comparison.
 
 \begin{table}[htbp]
 \caption{Communication Overhead Comparison}
@@ -33,4 +33,6 @@ Pipeline-Parallel & 66 GB & 2.4$\times$ \\
 \end{center}
 \end{table}
 
-This overhead stems from repeated gradient exchanges during multiple training epochs. Our goal is to reduce backward gradient communication while maintaining training performance, making pipeline parallelism viable for bandwidth-constrained environments.
+This overhead stems from repeated gradient exchanges during multiple training epochs. In the cloud setup, the entire neural network resides on a single machine, so gradient computation and backpropagation occur entirely in local memory. No gradients are ever transmitted over the network. The only communication cost is the one-time transfer of observations per iteration. Pipeline parallelism, by contrast, splits the network across machines and must exchange activations and gradients for every minibatch across all update epochs, amplifying communication by a factor proportional to the number of training passes over the data.
+
+Our goal is to reduce backward gradient communication while maintaining training performance, making pipeline parallelism viable for bandwidth-constrained environments.
