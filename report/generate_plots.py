@@ -221,3 +221,68 @@ for name, col in [('No Compression', 'none_smooth'), ('90th Percentile', 'p90_sm
     print(f"{name}: final EMA return = {val:.2f}")
 
 plt.close('all')
+
+# ============================================================
+# Data 5: Network transfer for exp4 runs (3 configurations)
+# ============================================================
+net_df = pd.read_csv('data_5/network_transfer.csv')
+
+# The Step column is the W&B step counter. Baseline ends at 2179,
+# p90 at ~1962, p90_decay at ~2054. Extrapolate shorter runs to 2179.
+max_step = net_df['Step'].max()
+
+for col in ['p90', 'p90_decay']:
+    # Get non-NaN rows for this column
+    valid = net_df[['Step', col]].dropna()
+    # Use post-warm-start data (step > 100) for linear fit
+    fit_data = valid[valid['Step'] > 100]
+    slope, intercept = np.polyfit(fit_data['Step'], fit_data[col], 1)
+
+    # Find steps where this column is NaN but baseline exists
+    missing_steps = net_df.loc[net_df[col].isna() & net_df['Step'].notna(), 'Step']
+    # Only extrapolate for steps beyond the last valid point
+    last_valid_step = valid['Step'].max()
+    extrap_steps = missing_steps[missing_steps > last_valid_step]
+
+    for s in extrap_steps:
+        net_df.loc[net_df['Step'] == s, col] = slope * s + intercept
+
+# Save extrapolated data
+net_df.to_csv('data_5/network_transfer_extrapolated.csv', index=False)
+
+# Figure: Cumulative Network Transfer (3 configurations)
+fig, ax = plt.subplots(figsize=(7, 4))
+
+for col, label, color in [
+    ('baseline', 'No Compression', colors['red']),
+    ('p90', '90th Percentile', colors['blue']),
+    ('p90_decay', '90th Percentile + 0.99 Decay', colors['orange']),
+]:
+    valid = net_df[['Step', col]].dropna()
+    ax.plot(valid['Step'], valid[col] / 1024,
+            color=color, linewidth=1.5, label=label, alpha=0.9)
+
+ax.axvline(x=98, color='black', linestyle='--', linewidth=1,
+           label='Warm Start End', alpha=0.6)
+
+ax.set_xlabel('Training Iterations', fontsize=11)
+ax.set_ylabel('Cumulative Data Transfer (GB)', fontsize=11)
+ax.set_title('Communication Overhead Comparison', fontsize=12, fontweight='bold')
+ax.legend(loc='upper left', frameon=True, fancybox=True, shadow=True)
+ax.grid(True, alpha=0.3, linestyle=':')
+ax.set_xlim(0, max_step)
+
+plt.tight_layout()
+plt.savefig('figures/exp4_network_transfer.pdf', bbox_inches='tight', dpi=300)
+plt.savefig('figures/exp4_network_transfer.png', bbox_inches='tight', dpi=300)
+print("Saved exp4_network_transfer.pdf and exp4_network_transfer.png")
+
+# Statistics
+print("\n=== Exp4 Network Transfer Statistics ===")
+for name, col in [('No Compression', 'baseline'), ('90th Percentile', 'p90'),
+                   ('90p + 0.99 Decay', 'p90_decay')]:
+    valid = net_df[col].dropna()
+    val = valid.iloc[-1] / 1024
+    print(f"{name}: cumulative transfer = {val:.2f} GB")
+
+plt.close('all')
