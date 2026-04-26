@@ -1,3 +1,4 @@
+
 # Experiment 2: Gradient Accumulation Compression — Plan
 
 ## Proven Config
@@ -71,6 +72,36 @@ ssh -p 40092 root@213.192.2.86 "tail -20 /tmp/machine0_29500.log"
 Logs:
 ```bash
 ssh -p 40092 root@213.192.2.86 "tail -20 /tmp/machine0_29501.log"
+```
+
+## Experiment 7 — Surprise Compression (90p z-score, sync every minibatch)
+
+| Run ID | Config | Status | Server | Port |
+|---|---|---|---|---|
+| `1777156828` | surprise, 90p z-score, ema=0.5, sync=1 | **STOPPED at iter 148/244** | root@213.192.2.120:40178 | 29500 |
+
+Surprise hyperparams:
+- `--gradient_compression_technique surprise`
+- `--surprise_compress_percentile 0.90` (send top 10% most surprising by z-score)
+- `--surprise_compress_ema_alpha 0.5` (equal weight history vs current gradient)
+- `--surprise_sync_interval 1` (sync mean/std to machine0 every minibatch)
+- `--warm_start_steps 30000` (build up stats before compressing)
+
+```bash
+MASTER_PORT=29500 WANDB_API_KEY=7e17edaf69249508fbdf0464123047fd4b4d21ff nohup bash run_experiment.sh \
+  --cuda \
+  --gradient_compression_technique surprise \
+  --surprise_compress_percentile 0.90 \
+  --surprise_compress_ema_alpha 0.5 \
+  --surprise_sync_interval 1 \
+  --warm_start_steps 30000 \
+  > /dev/null 2>&1 &
+```
+
+Logs:
+```bash
+ssh -p 40178 root@213.192.2.120 "tail -20 /tmp/machine0_29500.log"
+ssh -p 40178 root@213.192.2.120 "tail -20 /tmp/machine1_29500.log"
 ```
 
 ## General Tracking
