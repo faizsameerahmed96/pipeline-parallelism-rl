@@ -1,0 +1,10 @@
+\chapter{Additional Experiments}
+\label{app:percentile-sweep}
+
+Figure~\ref{fig:exp6-returns} shows training performance across five configurations using a different random seed than the main experiments. The baseline and 90th percentile with 0.99 decay both converge, confirming the robustness of the decay variant. Higher percentile thresholds (95th and 99th) with decay show progressively degraded performance, indicating that transmitting fewer than 10\% of gradients is insufficient for stable learning in this setting.
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\textwidth]{images/exp6_episodic_returns.pdf}}
+\caption{Training performance across percentile thresholds with a different random seed. The 90th percentile with 0.99 decay converges comparably to the baseline. The 95th percentile learns slowly, and the 99th percentile fails to learn. The dashed vertical line indicates warm start completion at 30,000 steps.}
+\label{fig:exp6-returns}
+\end{figure}

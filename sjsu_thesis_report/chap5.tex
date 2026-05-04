@@ -48,8 +48,7 @@ The improved performance of the decay variant over the no-decay 90th percentile 
 
 The 90th percentile configuration without decay ($\lambda = 1.0$) reaches an EMA return of 304, approximately 61\% of the baseline performance. This is consistent with our earlier findings: transmitting only 10\% of gradient values degrades learning quality for the CNN feature extractor, as the remaining 90\% of gradient dimensions receive no updates until they individually accumulate past the threshold. The gap between compressed and uncompressed training widens over time, suggesting that the accumulated error from missing gradient dimensions compounds as training progresses.
 
-We also experimented with a 99th percentile threshold, which transmits only the top 1\% of gradients by magnitude. At this level of sparsification, the agent failed to learn entirely. Episodic returns remained flat throughout training. Transmitting only 1\% of gradient values does not provide a strong enough learning signal for the CNN feature extractor to update its representations meaningfully.
-
+We also experimented with higher percentile thresholds with 0.99 decay. At the 95th percentile (transmitting only 5\% of gradients), the agent learns but at a significantly slower rate. At the 99th percentile (transmitting only 1\%), the agent fails to learn entirely, confirming that there is a minimum fraction of gradients required for the CNN feature extractor to receive a sufficient learning signal. We repeated the baseline and 90th percentile with decay experiments using a different random seed and observed both configurations converge to comparable performance, confirming the robustness of these results. The full training curves for all five configurations are shown in Appendix~\ref{app:percentile-sweep}.
 
 \section{Policy Evaluation}
 
@@ -99,3 +98,9 @@ No Compression          & 266 & ---  & 534.63 \\
 \end{table}
 
 The 90th percentile with decay achieves the same 35\% reduction in communication as the no-decay variant while producing a policy that matches or exceeds baseline performance. This demonstrates that gradient accumulation with percentile-based sparsification and buffer decay can meaningfully reduce communication overhead in pipeline-parallel reinforcement learning without sacrificing policy quality.
+
+\section{Robustness and Percentile Sensitivity}
+
+To verify that our results are not artifacts of a particular random seed, we repeated the baseline and 90th percentile with 0.99 decay experiments using a different seed. Both configurations converge to comparable performance levels, confirming that the decay variant consistently matches or exceeds the uncompressed baseline across seeds.
+
+We also explored higher percentile thresholds with 0.99 decay to understand how aggressively gradients can be sparsified. At the 95th percentile (transmitting only 5\% of gradients), the agent learns but at a significantly slower rate, reaching lower final returns. At the 99th percentile (transmitting only 1\%), the agent fails to learn entirely, consistent with our earlier findings without decay. These results indicate that while buffer decay is effective at preserving gradient quality, there is a minimum fraction of gradients that must be transmitted for the CNN feature extractor to receive a sufficient learning signal. The full training curves for all five configurations are shown in Appendix~\ref{app:percentile-sweep}.

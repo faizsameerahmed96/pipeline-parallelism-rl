@@ -286,3 +286,68 @@ for name, col in [('No Compression', 'baseline'), ('90th Percentile', 'p90'),
     print(f"{name}: cumulative transfer = {val:.2f} GB")
 
 plt.close('all')
+
+# ============================================================
+# Data 6: Five configurations with different seed
+# ============================================================
+exp6_df = pd.read_csv('data_6/wandb_export_2026-05-04T07_48_24.081-07_00.csv')
+
+exp6_cols = {
+    'baseline': '1776981725-grad-compression=none - charts/episodic_return',
+    'p90': '90p - charts/episodic_return',
+    'p90_decay': '1777001996-grad-compression=accumulate-grads - charts/episodic_return',
+    'p95_decay': '1777181264-grad-compression=accumulate-grads - charts/episodic_return',
+    'p99_decay': '1777181322-grad-compression=accumulate-grads - charts/episodic_return',
+}
+
+# Find the shortest run (last non-NaN global_step per column)
+max_steps = []
+for col in exp6_cols.values():
+    last_valid = exp6_df.loc[exp6_df[col].notna(), 'global_step'].max()
+    max_steps.append(last_valid)
+EXP6_MAX_STEP = min(max_steps)
+print(f"\nExp6: clipping to {EXP6_MAX_STEP} steps (shortest run)")
+
+exp6_cut = exp6_df[exp6_df['global_step'] <= EXP6_MAX_STEP].copy()
+
+# Smooth each series
+for key, col in exp6_cols.items():
+    exp6_cut[f'{key}_smooth'] = smooth_series(exp6_cut, col)
+
+# Figure: Episodic Returns (5 configurations)
+fig, ax = plt.subplots(figsize=(7, 4))
+
+plot_configs = [
+    ('baseline_smooth', 'No Compression', colors['red']),
+    ('p90_smooth', '90th Percentile', colors['blue']),
+    ('p90_decay_smooth', '90th Percentile + 0.99 Decay', colors['orange']),
+    ('p95_decay_smooth', '95th Percentile + 0.99 Decay', colors['green']),
+    ('p99_decay_smooth', '99th Percentile + 0.99 Decay', colors['purple']),
+]
+
+for col, label, color in plot_configs:
+    ax.plot(exp6_cut['global_step'], exp6_cut[col],
+            color=color, linewidth=1.5, label=label, alpha=0.9)
+
+ax.axvline(x=30000, color='black', linestyle='--', linewidth=1,
+           label='Warm Start End', alpha=0.6)
+
+ax.set_xlabel('Training Steps', fontsize=11)
+ax.set_ylabel('Episodic Return (EMA)', fontsize=11)
+ax.set_title('Training Performance Across Percentile Thresholds', fontsize=12, fontweight='bold')
+ax.legend(loc='upper left', frameon=True, fancybox=True, shadow=True, fontsize=8)
+ax.grid(True, alpha=0.3, linestyle=':')
+ax.set_xlim(0, EXP6_MAX_STEP)
+
+plt.tight_layout()
+plt.savefig('figures/exp6_episodic_returns.pdf', bbox_inches='tight', dpi=300)
+plt.savefig('figures/exp6_episodic_returns.png', bbox_inches='tight', dpi=300)
+print("Saved exp6_episodic_returns.pdf and exp6_episodic_returns.png")
+
+# Statistics
+print("\n=== Exp6 Final Statistics ===")
+for key, col in exp6_cols.items():
+    val = exp6_cut[f'{key}_smooth'].dropna().iloc[-1]
+    print(f"{key}: final EMA return = {val:.2f}")
+
+plt.close('all')
