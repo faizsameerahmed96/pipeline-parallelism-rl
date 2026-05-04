@@ -144,7 +144,6 @@
 \immediate\write\@auxout{\string\bibstyle{uriref}}
 \immediate\write\@auxout{\string\bibdata{references}}
 \def\addcustomcontentsline{}
-\makeatother
-\input{thesis.bbl}
+\IfFileExists{thesis.bbl}{\input{thesis.bbl}}{}\makeatother
 
 \end{document}

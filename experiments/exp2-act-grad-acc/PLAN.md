@@ -104,6 +104,38 @@ ssh -p 40178 root@213.192.2.120 "tail -20 /tmp/machine0_29500.log"
 ssh -p 40178 root@213.192.2.120 "tail -20 /tmp/machine1_29500.log"
 ```
 
+## Experiment 8 — Gradient Compression with Decay (accumulate-grads, 95p, decay=0.99)
+
+| Run ID | Config | Status | Server | Port |
+|---|---|---|---|---|
+| `1777181264` | accumulate-grads, 95p, decay=0.99 | **RUNNING** | root@69.30.85.242:22109 | 29500 |
+
+```bash
+MASTER_PORT=29500 WANDB_API_KEY=7e17edaf69249508fbdf0464123047fd4b4d21ff nohup bash run_experiment.sh \
+  --cuda \
+  --gradient_compression_technique accumulate-grads \
+  --accumulate_grads_percentile 0.95 \
+  --decay_buffer 0.99 \
+  --warm_start_steps 30000 \
+  > /dev/null 2>&1 &
+```
+
+## Experiment 9 — Gradient Compression with Decay (accumulate-grads, 99p, decay=0.99)
+
+| Run ID | Config | Status | Server | Port |
+|---|---|---|---|---|
+| `1777181322` | accumulate-grads, 99p, decay=0.99 | **RUNNING** | root@69.30.85.242:22109 | 29501 |
+
+```bash
+MASTER_PORT=29501 WANDB_API_KEY=7e17edaf69249508fbdf0464123047fd4b4d21ff nohup bash run_experiment.sh \
+  --cuda \
+  --gradient_compression_technique accumulate-grads \
+  --accumulate_grads_percentile 0.99 \
+  --decay_buffer 0.99 \
+  --warm_start_steps 30000 \
+  > /dev/null 2>&1 &
+```
+
 ## General Tracking
 
 ```bash

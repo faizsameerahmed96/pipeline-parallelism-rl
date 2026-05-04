@@ -66,3 +66,36 @@ Figure~\ref{fig:exp4-boxplot} shows box plots of episodic returns for the three 
 The interquartile ranges tell a similar story: the baseline spans [357, 721], the 90th percentile spans [190, 365], and the decay variant spans [417, 786]. The decay variant's IQR is shifted above the baseline's, consistent with the training curve observations. The 90th percentile without decay shows a tighter distribution but at substantially lower returns, with two outlier episodes above 800 that suggest the policy occasionally finds good trajectories but cannot do so consistently.
 
 These evaluation results reinforce the training performance findings: buffer decay mitigates the staleness problem in gradient accumulation, producing a policy comparable to the uncompressed baseline. Without decay, transmitting only 10\% of gradients leads to a meaningful degradation in final policy quality.
+
+\section{Communication Overhead}
+
+A primary goal of gradient compression is to reduce the volume of data transferred between machines during training. Figure~\ref{fig:exp4-transfer} shows cumulative data transfer over the full training run for each configuration.
+
+The baseline transmits the full $(b \times 4096)$ gradient tensor from Machine~1 to Machine~0 every minibatch, accumulating approximately 266~GB over the training run. Both compressed configurations transmit only a sparse representation containing the top 10\% of gradients by magnitude, along with their indices and shape metadata. This reduces cumulative transfer to approximately 173~GB, a 35\% reduction.
+
+The two compressed variants show nearly identical transfer volumes. This is expected: the decay factor $\lambda$ controls \emph{which} gradients exceed the percentile threshold, not \emph{how many}. Both configurations apply the same 90th percentile cutoff, so approximately the same fraction of gradient values is transmitted each minibatch. The difference between the two lies entirely in gradient quality: decay ensures that transmitted gradients reflect recent optimization state rather than stale accumulations.
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\textwidth]{images/exp4_network_transfer.pdf}}
+\caption{Cumulative data transfer over the training run. Both compressed configurations reduce transfer by approximately 35\% relative to the uncompressed baseline. The dashed vertical line indicates warm start completion.}
+\label{fig:exp4-transfer}
+\end{figure}
+
+Table~\ref{tab:transfer-summary} summarizes the transfer volumes and savings for each configuration alongside final policy performance.
+
+\begin{table}[htbp]
+\centering
+\caption{Communication overhead and policy performance summary.}
+\label{tab:transfer-summary}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Configuration} & \textbf{Transfer (GB)} & \textbf{Reduction} & \textbf{Mean Return} \\
+\midrule
+No Compression          & 266 & ---  & 534.63 \\
+90th Percentile         & 173 & 35\% & 285.56 \\
+90th Percentile + Decay & 173 & 35\% & 572.52 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The 90th percentile with decay achieves the same 35\% reduction in communication as the no-decay variant while producing a policy that matches or exceeds baseline performance. This demonstrates that gradient accumulation with percentile-based sparsification and buffer decay can meaningfully reduce communication overhead in pipeline-parallel reinforcement learning without sacrificing policy quality.
