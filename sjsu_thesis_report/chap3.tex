@@ -4,7 +4,7 @@ We consider a distributed RL setup where an agent learns to control the CarRacin
 
 \section{Communication Overhead Analysis}
 
-We compare data transfer requirements across two deployment scenarios over 100 training iterations with batch size 4096 (100 iterations $\times$ 4096 steps per iteration).
+As an example, we compare data transfer requirements across two deployment scenarios over 100 training iterations with batch size 4096 (100 iterations $\times$ 4096 steps per iteration).
 
 \textbf{Cloud Setup:} The local machine transmits raw observations to the cloud for complete training. Each observation is a $4 \times 96 \times 96$ tensor. Total data transfer:
 \begin{equation}
