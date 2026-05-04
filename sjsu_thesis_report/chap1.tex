@@ -4,7 +4,15 @@ Machine learning has transformed how computers solve complex tasks, from recogni
 
 Training an RL agent involves two alternating phases. In the \emph{rollout phase}, the agent interacts with the environment using its current policy, collecting a batch of experiences consisting of observations, actions, and rewards. In the \emph{training phase}, the agent uses this collected experience to update its policy through gradient-based optimization. The agent's policy is represented by a neural network, and training adjusts the network's parameters to increase the probability of actions that led to higher rewards. This cycle of collecting experience and updating the policy repeats until the agent achieves satisfactory performance.
 
-Modern RL agents often use deep neural networks with millions of parameters, particularly when the input is high-dimensional. For example, an agent learning to drive a car from camera images needs a convolutional neural network (CNN) to process visual observations before a policy network can select actions. As these networks grow in size and complexity, the computational and memory requirements for training can exceed what a single device can provide.
+\section{Actor-Critic Methods}
+
+A common approach in modern RL is to decompose the agent into two components: an \emph{actor} and a \emph{critic}. The actor is the policy network that selects actions given an observation. The critic is a separate network that estimates the \emph{value} of being in a given state, representing the total future reward the agent can expect from that point onward.
+
+During training, the critic's value estimates are used to compute an \emph{advantage} for each action the agent took: the difference between the actual return received and what the critic predicted. A positive advantage means the action performed better than expected, while a negative advantage means it performed worse. The actor is then updated to increase the probability of actions with positive advantage and decrease those with negative advantage.
+
+Proximal Policy Optimization (PPO)~\cite{ppo2017} builds on this actor-critic framework by constraining how much the policy can change in a single update, preventing large destabilizing jumps. PPO collects a batch of experience and reuses it across multiple training epochs, improving sample efficiency at the cost of additional computation per batch. This multi-epoch training is central to the communication challenge we address in this work, as each epoch requires gradient exchanges across the network split.
+
+Modern RL agents often use deep neural networks with millions of parameters, particularly when the input is high-dimensional. As these networks grow in size and complexity, the computational and memory requirements for training can exceed what a single device can provide. This is common in practical settings such as autonomous vehicles, where an on-board camera system may handle visual perception locally but must offload policy computation to a nearby edge server over a wireless link, or IoT sensor networks, where no single node has sufficient memory to host the full model and computation must be split across devices.
 
 \section{Distributed Training}
 
@@ -23,6 +31,8 @@ Consider a concrete example. An RL agent learning from $96 \times 96$ RGB images
 This project addresses the communication bottleneck through selective gradient transmission. Rather than sending all gradients from one machine to the other after every minibatch, we accumulate gradients locally and transmit only the most significant values based on magnitude percentile thresholds. Gradients that fall below the threshold are retained in a local buffer and continue accumulating until they become significant enough to send.
 
 A key challenge with this accumulation approach is gradient staleness. Gradients that remain in the buffer across multiple iterations may no longer reflect the current optimization landscape by the time they are finally transmitted. To address this, we introduce an exponential decay factor that progressively discounts older unsent gradients, ensuring the buffer reflects recent training dynamics rather than outdated signals.
+
+We evaluate our approach on the CarRacing-v3 environment, where a PPO agent learns to drive from $96 \times 96$ RGB images. The agent's CNN feature extractor and actor-critic network are split across two Docker containers connected via a bridge network, simulating pipeline parallelism over a bandwidth-constrained link. Using a 90th percentile threshold with buffer decay, we reduce cumulative data transfer by 35\% while the compressed agent matches or exceeds the uncompressed baseline in policy performance.
 
 \section{Thesis Organization}
 

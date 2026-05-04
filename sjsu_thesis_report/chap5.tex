@@ -20,18 +20,6 @@ The baseline without compression reaches an EMA return of approximately 496 befo
 \label{fig:exp4-returns}
 \end{figure}
 
-\section{Effect of Buffer Decay}
-
-The decay factor $\lambda = 0.99$ discounts the accumulation buffer before adding new gradients each minibatch. With 32 minibatches per epoch and 10 update epochs, the decay is applied 320 times per training iteration, yielding a per-iteration retention factor of $0.99^{320} \approx 0.04$. This means gradients that do not exceed the percentile threshold within a single iteration are effectively discarded.
-
-The improved performance of the decay variant over the no-decay 90th percentile can be explained by the staleness problem in the accumulation buffer. Without decay, below-threshold gradients accumulate slowly across iterations. By the time they eventually cross the percentile threshold, the optimization landscape has shifted. These stale gradients now point in a direction that is no longer optimal, causing the CNN feature extractor to take harmful update steps. The decay factor mitigates this by discounting older gradients, ensuring that only recently significant gradient signal reaches the transmission threshold. In effect, the decay acts as a relevance filter: gradients that are not important enough to send immediately are progressively forgotten rather than allowed to accumulate into a potentially misleading update.
-
-\section{Gradient Compression Without Decay}
-
-The 90th percentile configuration without decay ($\lambda = 1.0$) reaches an EMA return of 304, approximately 61\% of the baseline performance. This is consistent with our earlier findings: transmitting only 10\% of gradient values degrades learning quality for the CNN feature extractor, as the remaining 90\% of gradient dimensions receive no updates until they individually accumulate past the threshold. The gap between compressed and uncompressed training widens over time, suggesting that the accumulated error from missing gradient dimensions compounds as training progresses.
-
-We also experimented with higher percentile thresholds with 0.99 decay. At the 95th percentile (transmitting only 5\% of gradients), the agent learns but at a significantly slower rate. At the 99th percentile (transmitting only 1\%), the agent fails to learn entirely, confirming that there is a minimum fraction of gradients required for the CNN feature extractor to receive a sufficient learning signal. We repeated the baseline and 90th percentile with decay experiments using a different random seed and observed both configurations converge to comparable performance, confirming the robustness of these results. The full training curves for all five configurations are shown in Appendix~\ref{app:percentile-sweep}.
-
 \section{Policy Evaluation}
 
 \begin{figure}[htbp]
@@ -80,3 +68,15 @@ No Compression          & 266 & ---  & 534.63 \\
 \end{table}
 
 The 90th percentile with decay achieves the same 35\% reduction in communication as the no-decay variant while producing a policy that matches or exceeds baseline performance. This demonstrates that gradient accumulation with percentile-based sparsification and buffer decay can meaningfully reduce communication overhead in pipeline-parallel reinforcement learning without sacrificing policy quality.
+
+\section{Effect of Buffer Decay}
+
+The decay factor $\lambda = 0.99$ discounts the accumulation buffer before adding new gradients each minibatch. With 32 minibatches per epoch and 10 update epochs, the decay is applied 320 times per training iteration, yielding a per-iteration retention factor of $0.99^{320} \approx 0.04$. This means gradients that do not exceed the percentile threshold within a single iteration are effectively discarded.
+
+The improved performance of the decay variant over the no-decay 90th percentile can be explained by the staleness problem in the accumulation buffer. Without decay, below-threshold gradients accumulate slowly across iterations. By the time they eventually cross the percentile threshold, the optimization landscape has shifted. These stale gradients now point in a direction that is no longer optimal, causing the CNN feature extractor to take harmful update steps. The decay factor mitigates this by discounting older gradients, ensuring that only recently significant gradient signal reaches the transmission threshold. In effect, the decay acts as a relevance filter: gradients that are not important enough to send immediately are progressively forgotten rather than allowed to accumulate into a potentially misleading update.
+
+\section{Gradient Compression Without Decay}
+
+The 90th percentile configuration without decay ($\lambda = 1.0$) reaches an EMA return of 304, approximately 61\% of the baseline performance. This is consistent with our earlier findings: transmitting only 10\% of gradient values degrades learning quality for the CNN feature extractor, as the remaining 90\% of gradient dimensions receive no updates until they individually accumulate past the threshold. The gap between compressed and uncompressed training widens over time, suggesting that the accumulated error from missing gradient dimensions compounds as training progresses.
+
+We also experimented with higher percentile thresholds with 0.99 decay. At the 95th percentile (transmitting only 5\% of gradients), the agent learns but at a significantly slower rate. At the 99th percentile (transmitting only 1\%), the agent fails to learn entirely, confirming that there is a minimum fraction of gradients required for the CNN feature extractor to receive a sufficient learning signal. We repeated the baseline and 90th percentile with decay experiments using a different random seed and observed both configurations converge to comparable performance, confirming the robustness of these results. The full training curves for all five configurations are shown in Appendix~\ref{app:percentile-sweep}.

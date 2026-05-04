@@ -1,5 +1,47 @@
 \chapter{Method}
 
+\section{Gradient Accumulation with Percentile-Based Sparsification}
+
+In pipeline-parallel training, the neural network is partitioned across multiple devices. During each training step, the upstream device computes a forward pass and sends activations to the downstream device, which computes the loss and sends gradients back. In a standard setup, the full gradient tensor is transmitted after every minibatch. Our method reduces this communication by accumulating gradients locally on the downstream device and selectively transmitting only the most significant values.
+
+\textbf{Accumulation Phase:} The downstream device maintains a gradient accumulator $\mathbf{G} \in \mathbb{R}^{b \times d}$ initialized to zero, where $b$ is the minibatch size and $d$ is the activation dimension. After computing the backward pass for minibatch $i$, the feature gradients are added to the accumulator:
+\begin{equation}
+\mathbf{G} \leftarrow \mathbf{G} + \nabla_{\mathbf{f}_i} \mathcal{L}
+\end{equation}
+where $\nabla_{\mathbf{f}_i} \mathcal{L}$ represents gradients with respect to the upstream activations for minibatch $i$.
+
+\textbf{Sparsification and Transmission:} After accumulation, we compute the $p$-th percentile threshold on absolute gradient magnitudes:
+\begin{equation}
+\tau = \text{quantile}(|\mathbf{G}|, p)
+\end{equation}
+where $p \in [0, 1]$ is a configurable hyperparameter controlling the compression ratio. We create a binary mask $\mathbf{M}$ and transmit only gradients exceeding the threshold:
+\begin{equation}
+\mathbf{M}_{ij} = \begin{cases}
+1 & \text{if } |\mathbf{G}_{ij}| \geq \tau \\
+0 & \text{otherwise}
+\end{cases}
+\end{equation}
+
+The transmitted representation is sparse: it consists of the indices of selected elements, their gradient values, and the original tensor shape. For a percentile threshold of $p = 0.90$, only 10\% of gradient values are transmitted per minibatch. After transmission, selected gradients are zeroed in the accumulator so they are not retransmitted:
+\begin{equation}
+\mathbf{G}_{ij} \leftarrow \begin{cases}
+0 & \text{if } \mathbf{M}_{ij} = 1 \\
+\mathbf{G}_{ij} & \text{otherwise}
+\end{cases}
+\end{equation}
+
+The upstream device reconstructs the full gradient tensor from the sparse representation and uses it to update its parameters through standard backpropagation.
+
+\textbf{Buffer Decay:} Gradients that remain in the accumulator across many training steps may become stale as the optimization landscape shifts. To mitigate this, we optionally apply an exponential decay factor $\lambda \in (0, 1]$ before adding new gradients:
+\begin{equation}
+\mathbf{G} \leftarrow \lambda \mathbf{G} + \nabla_{\mathbf{f}_i} \mathcal{L}
+\end{equation}
+Setting $\lambda = 1.0$ recovers standard accumulation. Values below 1.0 discount older unsent gradients, ensuring the accumulator reflects recent optimization directions rather than outdated signals.
+
+\textbf{Warm Start:} To ensure stable initial training, full gradient communication is maintained for an initial warm start period before enabling sparsification. This allows the network to establish reasonable weights before introducing compression.
+
+The key advantage of this approach for reinforcement learning is that RL algorithms such as PPO reuse collected experience across multiple training epochs, naturally generating repeated gradient signals for similar data. This makes accumulation particularly effective: by deferring transmission until gradients become statistically significant, we reduce communication while preserving the most informative updates.
+
 \section{Experimental Setup}
 
 We train a reinforcement learning agent on the CarRacing-v3 environment, where the goal is to control a car around a racing track. Table~\ref{tab:env-properties} summarizes the environment properties. The observation space consists of $96 \times 96$ RGB images, and the action space is a 3-dimensional continuous vector controlling steering, acceleration, and braking.
@@ -40,44 +82,6 @@ The agent network consists of two components distributed across machines:
 
 During policy rollout, Machine~0 sends 4,096-dimensional feature vectors to Machine~1 for action selection, a 9$\times$ bandwidth savings compared to sending raw $4 \times 96 \times 96$ observations. However, the training phase requires bidirectional communication: forward activations and backward gradients must be exchanged for each minibatch across 10 epochs, creating the 66~GB overhead identified in Chapter~3.
 
-\section{Gradient Accumulation with Percentile-Based Sparsification}
+\section{Compression Configuration}
 
-To reduce backward gradient communication, we introduce a selective gradient transmission strategy inspired by Deep Gradient Compression~\cite{dgc2018}. Rather than transmitting full gradient tensors from Machine~1 to Machine~0 after each minibatch, we accumulate gradients locally on Machine~1 and transmit only the most significant values.
-
-\textbf{Accumulation Phase:} Machine~1 maintains a global gradient accumulator $\mathbf{G} \in \mathbb{R}^{b \times d}$ initialized to zero, where $b$ is the minibatch size (128) and $d$ is the feature dimension (4,096). After computing the backward pass for minibatch $i$, we accumulate the feature gradients:
-\begin{equation}
-\mathbf{G} \leftarrow \mathbf{G} + \nabla_{\mathbf{f}_i} \mathcal{L}
-\end{equation}
-where $\nabla_{\mathbf{f}_i} \mathcal{L}$ represents gradients with respect to CNN features for minibatch $i$.
-
-\textbf{Sparsification and Transmission:} After accumulation, we compute the $p$-th percentile threshold on absolute gradient magnitudes:
-\begin{equation}
-\tau = \text{quantile}(|\mathbf{G}|, p)
-\end{equation}
-where $p \in [0.90, 0.99]$ is a configurable hyperparameter. We create a binary mask $\mathbf{M}$ and transmit only gradients exceeding the threshold:
-\begin{equation}
-\mathbf{M}_{ij} = \begin{cases}
-1 & \text{if } |\mathbf{G}_{ij}| \geq \tau \\
-0 & \text{otherwise}
-\end{cases}
-\end{equation}
-
-The sparse gradient representation consists of three components: (1) indices of non-zero elements stored as int16 coordinates, (2) corresponding gradient values in bfloat16, and (3) tensor shape metadata. For a 90th percentile threshold, we transmit only 10\% of gradient values, achieving a theoretical 10$\times$ compression. After transmission, selected gradients are zeroed in the accumulator:
-\begin{equation}
-\mathbf{G}_{ij} \leftarrow \begin{cases}
-0 & \text{if } \mathbf{M}_{ij} = 1 \\
-\mathbf{G}_{ij} & \text{otherwise}
-\end{cases}
-\end{equation}
-
-\textbf{Reconstruction on Machine~0:} Machine~0 reconstructs the sparse gradient tensor from received indices and values, then applies it to update CNN parameters through standard backpropagation with gradient clipping (max norm 0.5) and Adam optimization (learning rate $5 \times 10^{-5}$).
-
-\textbf{Buffer Decay:} To mitigate potential staleness in the accumulator, we optionally apply an exponential decay factor $\lambda \in (0, 1]$ before adding new gradients:
-\begin{equation}
-\mathbf{G} \leftarrow \lambda \mathbf{G} + \nabla_{\mathbf{f}_i} \mathcal{L}
-\end{equation}
-Setting $\lambda = 1.0$ recovers the standard accumulation. Values below 1.0 discount older, unsent gradients so that the accumulator reflects more recent optimization directions.
-
-\textbf{Warm Start:} To ensure stable initial training, we apply full gradient communication for the first 30,000 timesteps before enabling gradient accumulation. This allows the network to establish reasonable initial weights before introducing compression.
-
-The key advantage of this approach for RL is that repeated training epochs naturally generate multiple gradient signals for similar data, making accumulation particularly effective. By deferring transmission until gradients become statistically significant, we reduce communication while preserving the most informative updates for the feature extractor.
+We apply the gradient accumulation method from Section~4.1 to the backward gradient communication from Machine~1 to Machine~0. The accumulator operates on the feature gradient tensor of shape $(128 \times 4096)$, where 128 is the minibatch size and 4,096 is the CNN output dimension. Sparse representations use int16 indices and bfloat16 values to minimize transmission size. The upstream device (Machine~0) reconstructs the sparse gradient tensor and applies it to update CNN parameters through standard backpropagation with gradient clipping (max norm 0.5) and Adam optimization (learning rate $5 \times 10^{-5}$). The warm start period is set to 30,000 timesteps.

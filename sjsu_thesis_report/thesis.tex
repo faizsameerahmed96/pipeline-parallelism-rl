@@ -146,7 +146,6 @@
 
 % Force bibliography output (hyperref overrides the class's \enddocument hook)
 \makeatletter
-\immediate\write\@auxout{\string\bibstyle{uriref}}
 \immediate\write\@auxout{\string\bibdata{references}}
 \def\addcustomcontentsline{}
 \IfFileExists{thesis.bbl}{\input{thesis.bbl}}{}\makeatother
