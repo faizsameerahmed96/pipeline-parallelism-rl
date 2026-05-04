@@ -4,7 +4,7 @@ Before arriving at gradient accumulation with percentile-based sparsification, w
 
 \section{Gradient Accumulation Results}
 
-We evaluate our gradient accumulation approach across three configurations on CarRacing-v3: (1) baseline pipeline parallelism without compression, (2) 90th percentile sparsification without decay ($\lambda = 1.0$), and (3) 90th percentile sparsification with 0.99 buffer decay. All runs use the proven hyperparameter configuration: \texttt{num\_envs=1}, \texttt{num\_steps=4096}, learning rate $4 \times 10^{-5}$, 32 minibatches, and a total training budget of 1,000,000 timesteps (244 iterations). Gradient compression activates after a 30,000-step warm start period. Episodic returns are smoothed using exponential moving average (EMA) with decay 0.9.
+All experiments were conducted on a machine equipped with an NVIDIA RTX 3090 GPU (24~GB VRAM) running Ubuntu Linux. We evaluate our gradient accumulation approach across three configurations on CarRacing-v3: (1) baseline pipeline parallelism without compression, (2) 90th percentile sparsification without decay ($\lambda = 1.0$), and (3) 90th percentile sparsification with 0.99 buffer decay. All runs use the proven hyperparameter configuration: \texttt{num\_envs=1}, \texttt{num\_steps=4096}, learning rate $4 \times 10^{-5}$, 32 minibatches, and a total training budget of 1,000,000 timesteps (244 iterations). Gradient compression activates after a 30,000-step warm start period. Episodic returns are smoothed using exponential moving average (EMA) with decay 0.9.
 
 \section{Training Performance}
 
