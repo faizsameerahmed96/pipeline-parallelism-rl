@@ -1,4 +1,25 @@
 \chapter{Additional Experiments}
+
+\section{Preliminary Compression Approaches}
+\label{app:preliminary-compression}
+
+Before arriving at gradient accumulation with percentile-based sparsification, we explored two alternative compression strategies that aimed to reduce communication by leveraging the statistical structure of gradient distributions.
+
+\textbf{Summary Statistics Compression.} Our first approach replaced full gradient tensors with compact summary statistics. Instead of transmitting the full $(b \times 4096)$ gradient tensor from Machine~1, we computed the mean and standard deviation across the batch dimension, producing a $(2 \times 4096)$ summary. Machine~0 then reconstructed an approximate gradient tensor by sampling from $\mathcal{N}(\mu_j, \sigma_j)$ per dimension~$j$. This reduces each transmission from $b \times 4096$ values to $2 \times 4096$ values, a compression factor equal to $b/2$ (64$\times$ at batch size 128). However, the reconstructed gradients are stochastic approximations that discard all per-sample structure, replacing the actual gradient landscape with noise shaped by the summary statistics.
+
+\textbf{Information-Theoretic Filtering.} Our second approach built on the summary statistics by maintaining per-dimension running mean $\mu_j$ and variance $\sigma_j^2$ via exponential moving average across minibatches. Rather than sending summary statistics, we used these distributions to identify which individual gradient values were most informative. For each element in the full gradient tensor, we computed a z-score $z_{ij} = |g_{ij} - \mu_j| / \sigma_j$ measuring how surprising the observed gradient is relative to the running distribution. Only the top 10\% of elements by z-score were transmitted as sparse tensors. Machine~0 reconstructed unsent positions by sampling from $\mathcal{N}(\mu_j, \sigma_j)$ rather than using zeros, providing a distributional approximation for missing values. The running statistics were periodically synced from Machine~1 to Machine~0 at minimal overhead (two 4096-dimensional vectors).
+
+Figure~\ref{fig:early-experiments} shows training performance for both approaches against the uncompressed baseline over approximately 500,000 steps. The summary statistics approach reaches an EMA return of 254, roughly half the baseline's 512, indicating that the stochastic reconstruction preserves enough gradient signal for partial learning but loses too much per-sample information for competitive performance. The information-theoretic filtering approach fails to learn meaningfully, with episodic returns remaining near zero throughout training. Despite its theoretical appeal, selecting gradients by statistical surprise rather than magnitude does not provide a useful learning signal for the CNN feature extractor in this setting.
+
+These results motivated our transition to gradient accumulation with percentile-based sparsification, which operates on raw gradient magnitudes and avoids stochastic reconstruction entirely.
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\textwidth]{images/exp5_early_experiments.pdf}}
+\caption{Preliminary compression approaches over approximately 500,000 steps. Summary statistics compression achieves partial learning at roughly half the baseline return. Information-theoretic filtering fails to learn. The dashed vertical line indicates warm start completion at 30,000 steps.}
+\label{fig:early-experiments}
+\end{figure}
+
+\section{Percentile Threshold Sweep}
 \label{app:percentile-sweep}
 
 Figure~\ref{fig:exp6-returns} shows training performance across five configurations using a different random seed than the main experiments. The baseline and 90th percentile with 0.99 decay both converge, confirming the robustness of the decay variant. Higher percentile thresholds (95th and 99th) with decay show progressively degraded performance, indicating that transmitting fewer than 10\% of gradients is insufficient for stable learning in this setting.

@@ -1,28 +1,10 @@
 \chapter{Evaluation Results}
 
-\section{Preliminary Compression Approaches}
-
-Before arriving at gradient accumulation with percentile-based sparsification, we explored two alternative compression strategies that aimed to reduce communication by leveraging the statistical structure of gradient distributions.
-
-\textbf{Summary Statistics Compression.} Our first approach replaced full gradient tensors with compact summary statistics. Instead of transmitting the full $(b \times 4096)$ gradient tensor from Machine~1, we computed the mean and standard deviation across the batch dimension, producing a $(2 \times 4096)$ summary. Machine~0 then reconstructed an approximate gradient tensor by sampling from $\mathcal{N}(\mu_j, \sigma_j)$ per dimension~$j$. This reduces each transmission from $b \times 4096$ values to $2 \times 4096$ values, a compression factor equal to $b/2$ (64$\times$ at batch size 128). However, the reconstructed gradients are stochastic approximations that discard all per-sample structure, replacing the actual gradient landscape with noise shaped by the summary statistics.
-
-\textbf{Information-Theoretic Filtering.} Our second approach built on the summary statistics by maintaining per-dimension running mean $\mu_j$ and variance $\sigma_j^2$ via exponential moving average across minibatches. Rather than sending summary statistics, we used these distributions to identify which individual gradient values were most informative. For each element in the full gradient tensor, we computed a z-score $z_{ij} = |g_{ij} - \mu_j| / \sigma_j$ measuring how surprising the observed gradient is relative to the running distribution. Only the top 10\% of elements by z-score were transmitted as sparse tensors. Machine~0 reconstructed unsent positions by sampling from $\mathcal{N}(\mu_j, \sigma_j)$ rather than using zeros, providing a distributional approximation for missing values. The running statistics were periodically synced from Machine~1 to Machine~0 at minimal overhead (two 4096-dimensional vectors).
-
-Figure~\ref{fig:early-experiments} shows training performance for both approaches against the uncompressed baseline over approximately 500,000 steps. The summary statistics approach reaches an EMA return of 254, roughly half the baseline's 512, indicating that the stochastic reconstruction preserves enough gradient signal for partial learning but loses too much per-sample information for competitive performance. The information-theoretic filtering approach fails to learn meaningfully, with episodic returns remaining near zero throughout training. Despite its theoretical appeal, selecting gradients by statistical surprise rather than magnitude does not provide a useful learning signal for the CNN feature extractor in this setting.
-
-These results motivated our transition to gradient accumulation with percentile-based sparsification, which operates on raw gradient magnitudes and avoids stochastic reconstruction entirely.
-
-\begin{figure}[htbp]
-\centerline{\includegraphics[width=\textwidth]{images/exp5_early_experiments.pdf}}
-\caption{Preliminary compression approaches over approximately 500,000 steps. Summary statistics compression achieves partial learning at roughly half the baseline return. Information-theoretic filtering fails to learn. The dashed vertical line indicates warm start completion at 30,000 steps.}
-\label{fig:early-experiments}
-\end{figure}
+Before arriving at gradient accumulation with percentile-based sparsification, we explored two alternative compression strategies based on summary statistics and information-theoretic filtering. Neither approach achieved competitive performance; details are provided in Appendix~\ref{app:preliminary-compression}.
 
 \section{Gradient Accumulation Results}
 
 We evaluate our gradient accumulation approach across three configurations on CarRacing-v3: (1) baseline pipeline parallelism without compression, (2) 90th percentile sparsification without decay ($\lambda = 1.0$), and (3) 90th percentile sparsification with 0.99 buffer decay. All runs use the proven hyperparameter configuration: \texttt{num\_envs=1}, \texttt{num\_steps=4096}, learning rate $4 \times 10^{-5}$, 32 minibatches, and a total training budget of 1,000,000 timesteps (244 iterations). Gradient compression activates after a 30,000-step warm start period. Episodic returns are smoothed using exponential moving average (EMA) with decay 0.9.
-
-The three experiments ran concurrently on a single RTX 3090 GPU. The baseline and 90th percentile runs terminated early due to instability. The baseline crashed at iteration 169 with NaN values in the policy, and the 90th percentile crashed at iteration 172 with a CUDA TensorPipe error. The decay variant was manually stopped at iteration 121. As a result, the reported training curves extend to approximately 692,000 steps (the shortest run).
 
 \section{Training Performance}
 
@@ -98,9 +80,3 @@ No Compression          & 266 & ---  & 534.63 \\
 \end{table}
 
 The 90th percentile with decay achieves the same 35\% reduction in communication as the no-decay variant while producing a policy that matches or exceeds baseline performance. This demonstrates that gradient accumulation with percentile-based sparsification and buffer decay can meaningfully reduce communication overhead in pipeline-parallel reinforcement learning without sacrificing policy quality.
-
-\section{Robustness and Percentile Sensitivity}
-
-To verify that our results are not artifacts of a particular random seed, we repeated the baseline and 90th percentile with 0.99 decay experiments using a different seed. Both configurations converge to comparable performance levels, confirming that the decay variant consistently matches or exceeds the uncompressed baseline across seeds.
-
-We also explored higher percentile thresholds with 0.99 decay to understand how aggressively gradients can be sparsified. At the 95th percentile (transmitting only 5\% of gradients), the agent learns but at a significantly slower rate, reaching lower final returns. At the 99th percentile (transmitting only 1\%), the agent fails to learn entirely, consistent with our earlier findings without decay. These results indicate that while buffer decay is effective at preserving gradient quality, there is a minimum fraction of gradients that must be transmitted for the CNN feature extractor to receive a sufficient learning signal. The full training curves for all five configurations are shown in Appendix~\ref{app:percentile-sweep}.
