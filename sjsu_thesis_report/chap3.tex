@@ -1,18 +1,18 @@
 \chapter{Problem Statement}
 
-We consider a distributed RL setup where an agent learns to control the CarRacing-v3 environment through interaction. Our agent includes; a Convolutional Neural Network (CNN), which extracts features from images, as well as Actor-Critic networks to learn about its policy and the value of being in each state. Due to limited resources, we have split the Agent into two Machines. Machine~0 will host the CNN and the Environment Interaction. Machine~1 will be responsible for hosting the Actor-Critic Networks.
+We consider a distributed RL setup where an agent learns to control the CarRacing-v3 environment through interaction. Our agent includes: a Convolutional Neural Network (CNN), which extracts features from images, as well as actor-critic networks to learn about its policy and the value of being in each state. Due to limited resources, we have split the agent into two machines. Machine~0 will host the CNN and the environment interaction. Machine~1 will be responsible for hosting the actor-critic networks.
 
 \section{Communication Overhead Analysis}
 
-This section compares the total amount of data required to be transferred during both Cloud and Pipeline Parallel Setups in terms of the number of bytes transferred during 100 Training Iterations using a Batch Size of 4096. 
-Each Observation is a 4x96x96 Tensor.
+This section compares the total amount of data required to be transferred during both Cloud and Pipeline Parallel Setups in terms of the number of bytes transferred during 100 training iterations using a batch size of 4096. 
+Each observation is a $4 \times 96 \times 96$ tensor.
 
-\textbf{Cloud Setup}: Each time the local machine sends a new set of observations to the cloud for full training it has to send all 4x96x96 Tensors. For 100 iterations x 4096 Steps per Iteration each observation will have to be sent 100 times. Therefore, total amount of data that will have to be transmitted as follows:
+\textbf{Cloud Setup}: Each time the local machine sends a new set of observations to the cloud for full training it has to send all $4 \times 96 \times 96$ tensors. For 100 iterations $\times$ 4096 steps per iteration each observation will have to be sent 100 times. Therefore, the total amount of data that will have to be transmitted is as follows:
 \begin{equation}
 100 \times 4096 \times (4 \times 96 \times 96) = 14.7\text{B tensors} \approx 28\text{ GB}
 \end{equation}
 
-\textbf{Pipeline-Parallel Setup:} The CNN is running on a local machine which transmits the output of each layer (activation) to Machine ~1 and receives the loss gradients for backpropagation. With 10 update epochs per batch and 32 minibatches per epoch (minibatch size 128), we transmit 4096-dimensional activation and gradient vectors. Total data transfer:
+\textbf{Pipeline-Parallel Setup:} The CNN is running on a local machine which transmits the output of each layer (activation) to Machine~1 and receives the loss gradients for backpropagation. With 10 update epochs per batch and 32 minibatches per epoch (minibatch size 128), we transmit 4096-dimensional activation and gradient vectors. Total data transfer:
 \begin{equation}
 100 \times 10 \times 32 \times 128 \times 4096 \times 2 = 32.7\text{B tensors} \approx 66\text{ GB}
 \end{equation}
@@ -34,6 +34,6 @@ Pipeline-Parallel & 66 GB & 2.4$\times$ \\
 \end{center}
 \end{table}
 
-The source of this overhead is that gradient updates take place repeatedly as each epoch is completed. As with the "cloud" case described above, since the model is located entirely on one machine, both gradient computations and back-propagations are performed using only local memory. Therefore no gradients are transferred at any time across the network. The only overhead associated with transferring information across the network is an initial transfer of each observation (i.e., input) for each iteration of the algorithm.
+The source of this overhead is that gradient updates take place repeatedly as each epoch is completed. In the cloud setup, since the model is located entirely on one machine, both gradient computations and backpropagation are performed using only local memory. Therefore no gradients are transferred at any time across the network. The only overhead associated with transferring information across the network is an initial transfer of each observation (i.e., input) for each iteration of the algorithm.
 
 We want to decrease backward gradient communication without sacrificing training performance to allow for the use of pipeline parallelism in environments where bandwidth is limited.
