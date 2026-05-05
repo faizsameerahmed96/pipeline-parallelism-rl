@@ -1,6 +1,6 @@
 \chapter{Introduction}
 
-Machine learning has dramatically changed how computers are able to accomplish difficult tasks such as identifying objects within images to driving cars autonomously. 
+Machine learning has dramatically changed how computers are able to accomplish difficult tasks from identifying objects within images to driving cars autonomously. 
 In supervised machine learning, a model is trained by comparing its results with an existing dataset which is the ground truth. 
 In contrast to this type of learning, reinforcement learning (RL) is a method for learning based upon experience; i.e., RL agents learn through direct interaction with their environments using trial and error. 
 Each time the agent interacts with its environment, the agent observes the current state of the environment, takes some action and then receives a reward signal to indicate how good or bad that action was. 
@@ -10,11 +10,11 @@ Training an RL agent involves two alternating phases. In the \emph{rollout phase
 
 \section{Actor-Critic Methods}
 
-In modern RL, we decompose the agent into two components: an actor and a critic. The actor is simply the policy network which chooses the next action based upon its current knowledge of the environment. The critic is another independent network whose function is to estimate the total ``value'' associated with a particular state. That is, if the agent is in some state and follows its policy from that state forward, what would be the sum of rewards it receives? The critic estimates this quantity.
+In modern RL, we decompose the agent into two components: an actor and a critic. The actor is simply the policy network, which chooses the next action based upon its current knowledge of the environment. The critic is another independent network whose function is to estimate the total ``value'' associated with a particular state. That is, if the agent is in some state and follows its policy from that state forward, what would be the sum of rewards it receives? The critic estimates this quantity.
 
 To train both the actor and the critic, we first calculate an ``advantage'' for every action taken by the agent by comparing what the agent actually got as a return versus what the critic estimated. A positive advantage means the action performed better than expected, while a negative advantage means it performed worse. The actor and critic networks are then updated so the probability of actions leading to positive advantage increases and vice-versa.
 
-Proximal Policy Optimization (PPO), which was developed by Schulman et al.~\cite{ppo2017}, extends the general actor-critic framework through bounding how much the policy changes with respect to the amount of data used in an update; thus, potentially reducing the likelihood of large-scale destabilization in training. To improve sample efficiency while increasing computational requirements for each batch, PPO trains using batches that are reused over multiple training epochs. The reuse of batches, however, creates a communication problem among nodes in the distributed environment because each epoch in a PPO iteration involves exchanging gradients throughout the entire network split.
+Proximal Policy Optimization (PPO), which was developed by Schulman et al.~\cite{ppo2017}, extends the general actor-critic framework through bounding how much the policy changes with respect to the amount of data used in an update; thus, potentially reducing the likelihood of large-scale destabilization in training. To improve sample efficiency, at the cost of increased computation per batch, PPO trains using batches that are reused over multiple training epochs. The reuse of batches, however, creates a communication problem among nodes in the distributed environment because each epoch in a PPO iteration involves exchanging gradients throughout the entire network split.
 
 \section{Distributed Training}
 
@@ -30,7 +30,7 @@ Consider a concrete example. An RL agent learning from $96 \times 96$ RGB images
 
 \section{Our Approach}
 
-This project uses a technique called selective gradient transmission to alleviate the communication bottleneck. Instead of transmitting each minibatch’s full set of gradients from one machine to another after every minibatch, we have each machine store (accumulate) its gradients locally and then transmit only those gradients deemed most important based on their magnitude relative to some defined percentiles. If a gradient does not exceed its associated percentile it is stored in a “local buffer” and continues to be added to as it becomes large enough for transmission.
+This project uses a technique called selective gradient transmission to alleviate the communication bottleneck. Instead of transmitting each minibatch’s full set of gradients from one machine to another after every minibatch, we have each machine store (accumulate) its gradients locally and then transmit only those gradients deemed most important based on their magnitude relative to some defined percentiles. If a gradient does not exceed its associated percentile it is stored in a ``local buffer'' and continues to be added to as it becomes large enough for transmission.
 
 However, the use of buffers to store gradients can lead to the problem of stale gradients; since gradients that have been in storage for many iterations will likely represent old versions of the optimization space, by the time they are eventually sent they are unlikely to provide useful information about the current version of the optimization space. We propose using a decaying value (exponential decay) to penalize (discount) these older unsent gradients so that when gradients are eventually sent, the buffer contains a representation of the recent version(s) of the optimization space.
 
