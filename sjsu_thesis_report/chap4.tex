@@ -40,9 +40,9 @@ The reconstruction of the entire gradient tensor is done by the upstream device.
 \end{equation}
 Setting $\lambda = 1.0$ represents standard accumulation without any decay. Values below 1.0 discount older unsent gradients, ensuring the gradient buffer reflects recent optimization directions rather than outdated signals.
 
-\textbf{Warm Start:} To ensure stable initial training, full gradient communication is maintained for an initial warm start period before enabling sparsification. This allows the network to establish reasonable weights before introducing compression.
+\textbf{Warm Start:} To create a stable initial condition during training, we keep all full gradient communications for an initial time called a ``warm start'' period after which sparse communication will be allowed. The model has a chance to develop some reasonably good weights before they are compressed after the warm start period.
 
-The key advantage of this approach for reinforcement learning is that RL algorithms such as PPO reuse collected experience across multiple training epochs, naturally generating repeated gradient signals for similar data. This makes accumulation particularly effective: by deferring transmission until gradients become statistically significant, we reduce communication while preserving the most informative updates.
+The main advantages of our method is that reinforcement learning methods such as PPO use past experiences repeatedly throughout every epoch of training, resulting in repeated gradient signals for very similar data. As such, this creates a natural opportunity for accumulation. By delaying transmissions until sufficient statistical significance is reached, we can greatly reduce communication while maintaining a high quality of updates.
 
 \section{Experimental Setup}
 
