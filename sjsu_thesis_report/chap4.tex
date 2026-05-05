@@ -1,16 +1,18 @@
 \chapter{Method}
 
+This chapter presents our gradient accumulation method with percentile-based sparsification, followed by the experimental setup used to evaluate it.
+
 \section{Gradient Accumulation with Percentile-Based Sparsification}
 
-In pipeline-parallel training, the neural network is partitioned across multiple devices. During each training step, the upstream device computes a forward pass and sends activations to the downstream device, which computes the loss and sends gradients back. In a standard setup, the full gradient tensor is transmitted after every minibatch. Our method reduces this communication by accumulating gradients locally on the downstream device and selectively transmitting only the most significant values.
+Pipeline-parallel training involves splitting the neural network across different computing devices. Each time through a training step, the upstream device calculates the forward-pass activation of its portion of the input data, then passes those activations to the next device in line. The downstream device calculates the loss for that data point and sends the gradients back. In the standard implementation, the entire gradient tensor will be sent from one device to another at the end of every mini-batch. The proposed algorithm modifies this process so that it transmits only the largest gradient values calculated during local accumulation on the downstream device.
 
-\textbf{Accumulation Phase:} The downstream device maintains a gradient accumulator $\mathbf{G} \in \mathbb{R}^{b \times d}$ initialized to zero, where $b$ is the minibatch size and $d$ is the activation dimension. After computing the backward pass for minibatch $i$, the feature gradients are added to the accumulator:
+\textbf{Accumulation Phase:} The downstream device has a gradient accumulator $\mathbf{G} \in \mathbb{R}^{b\times d}$, which is set to zero at initialization, with $b$ denoting the batch size, and $d$ representing the number of dimensions for the activations. For each minibatch processed, feature-wise gradients are added to the gradient accumulator.
 \begin{equation}
 \mathbf{G} \leftarrow \mathbf{G} + \nabla_{\mathbf{f}_i} \mathcal{L}
 \end{equation}
-where $\nabla_{\mathbf{f}_i} \mathcal{L}$ represents gradients with respect to the upstream activations for minibatch $i$.
+where $\nabla_{\mathbf{f}_i} \mathcal{L}$ is the gradient with respect to the upstream activation values in minibatch $i$.
 
-\textbf{Sparsification and Transmission:} After accumulation, we compute the $p$-th percentile threshold on absolute gradient magnitudes:
+\textbf{Sparsification and Transmission:} We compute the $p$-th percentile threshold on the absolute gradient magnitudes:
 \begin{equation}
 \tau = \text{quantile}(|\mathbf{G}|, p)
 \end{equation}
@@ -22,7 +24,7 @@ where $p \in [0, 1]$ is a configurable hyperparameter controlling the compressio
 \end{cases}
 \end{equation}
 
-The transmitted representation is sparse: it consists of the indices of selected elements, their gradient values, and the original tensor shape. For a percentile threshold of $p = 0.90$, only 10\% of gradient values are transmitted per minibatch. After transmission, selected gradients are zeroed in the accumulator so they are not retransmitted:
+After sparsifying this representation with respect to a specified percent ($p=0.9$), 10\% of the gradient values in each mini-batch are sent. Finally, we nullify the gradient values from previous iterations since we do not want them re-transmitted:
 \begin{equation}
 \mathbf{G}_{ij} \leftarrow \begin{cases}
 0 & \text{if } \mathbf{M}_{ij} = 1 \\
@@ -30,13 +32,13 @@ The transmitted representation is sparse: it consists of the indices of selected
 \end{cases}
 \end{equation}
 
-The upstream device reconstructs the full gradient tensor from the sparse representation and uses it to update its parameters through standard backpropagation.
+The reconstruction of the entire gradient tensor is done by the upstream device. The upstream device uses the reconstructed gradient tensor to update its parameters using standard backpropagation.
 
-\textbf{Buffer Decay:} Gradients that remain in the accumulator across many training steps may become stale as the optimization landscape shifts. To mitigate this, we optionally apply an exponential decay factor $\lambda \in (0, 1]$ before adding new gradients:
+\textbf{Buffer Decay:} After many iterations of training, gradients stored within a buffer will begin to reflect older signal information about how to improve model performance because the actual ``optimization landscape'' has shifted. This problem is addressed with optional application of an exponential decay factor $\lambda \in (0, 1]$ when incorporating additional gradient data into the buffer:
 \begin{equation}
 \mathbf{G} \leftarrow \lambda \mathbf{G} + \nabla_{\mathbf{f}_i} \mathcal{L}
 \end{equation}
-Setting $\lambda = 1.0$ recovers standard accumulation. Values below 1.0 discount older unsent gradients, ensuring the accumulator reflects recent optimization directions rather than outdated signals.
+Setting $\lambda = 1.0$ represents standard accumulation without any decay. Values below 1.0 discount older unsent gradients, ensuring the gradient buffer reflects recent optimization directions rather than outdated signals.
 
 \textbf{Warm Start:} To ensure stable initial training, full gradient communication is maintained for an initial warm start period before enabling sparsification. This allows the network to establish reasonable weights before introducing compression.
 
