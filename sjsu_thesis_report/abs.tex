@@ -2,6 +2,7 @@ Reinforcement learning is a family of machine learning algorithms in which an ag
 In traditional distributed RL architectures, the experiences are transferred to a centralized server that trains the network and transfers the updated neural network back to the device.
 However, in resource-constrained environments, where an entire model cannot fit on a single device, pipeline parallelism is used across multiple devices, which increases the communication overhead substantially since we need to transfer both forward activations and backward gradients between devices for each training epoch.
 This is further exacerbated during RL training since there are multiple updates for a single batch to improve sample efficiency.
+
 In this project, we present a technique that accumulates gradients and only transmits high-magnitude gradients during backward propagation. Additionally, we introduce an exponential buffer decay mechanism to mitigate gradient staleness, which prevents outdated accumulated gradients from producing harmful updates to the agent.
 We reduce network transfer by 35\% while maintaining performance comparable to full gradient communication.
 
