@@ -46,7 +46,7 @@ The main advantages of our method is that reinforcement learning methods such as
 
 \section{Experimental Setup}
 
-We train a reinforcement learning agent on the CarRacing-v3 environment, where the goal is to control a car around a racing track. Table~\ref{tab:env-properties} summarizes the environment properties. The observation space consists of $96 \times 96$ RGB images, and the action space is a 3-dimensional continuous vector controlling steering, acceleration, and braking.
+We train a reinforcement learning agent within the CarRacing-v3 environment. The objective of the environment is to control a vehicle around a racing track. See Table~\ref{tab:env-properties} for details regarding environment properties. The observation space is composed of $96 \times 96$ RGB images and the action space is a three-dimensional continuous vector used to control steering, acceleration, and braking.
 
 \begin{table}[htbp]
 \centering
@@ -62,11 +62,9 @@ Action Space & Box([-1, 0, 0], 1.0, (3,), float32) \\
 \end{tabular}
 \end{table}
 
-We chose this environment because it requires continuous visual perception as input to the policy, mirroring real-world scenarios such as autonomous driving or robotic navigation where high-dimensional image data must be transmitted between distributed components. This makes it a representative testbed for evaluating communication efficiency in pipeline-parallel training, since the CNN feature extractor must process image observations at every timestep and exchange activations and gradients across the network split.
+The CarRacing-v3 environment provides a continuous visual perception from an image input to the policy. This mirrors real-world applications including autonomous vehicles, robotics and other forms of intelligent systems where large amounts of high-dimensional image data will have to be exchanged among different nodes within a network. Therefore, it serves as a good model for testing communication efficiency through pipeline-parallel training. Specifically, the CNN feature extractor will need to analyze image inputs at every timestep as well as transmit activation values and gradient information throughout the network split.
 
-Each observation is stacked as a $4 \times 96 \times 96$ tensor representing four consecutive frames. The agent employs Proximal Policy Optimization (PPO)~\cite{ppo2017} with a total training budget of 800,000 timesteps, where each iteration consists of 4,096 environment steps followed by 10 update epochs with 32 minibatches of size 128.
-
-To simulate pipeline parallelism across bandwidth-constrained devices, we deploy our system using Docker Compose with two containers connected via a bridge network, as shown in Figure~\ref{fig:docker-setup}. Machine~0 hosts the environment and CNN feature extractor, while Machine~1 hosts the actor-critic network. Communication between machines uses PyTorch's distributed RPC framework, which transmits tensors over the network and provides a realistic simulation of inter-device bandwidth limitations.
+To simulate pipeline parallelism across bandwidth-constrained devices, we created a multi-container environment using Docker Compose. The environment contains two containers linked together by a bridge network. As depicted in Figure~\ref{fig:docker-setup}, Machine~0 contains both the environment and the CNN feature extractor; while Machine~1 contains the actor-critic neural network. The transfer of information between the two machines utilizes PyTorch's distributed RPC (Remote Procedure Call) interface for transferring tensors across networks. Thus, this method can provide an accurate representation of the bandwidth limitations present when communicating between multiple devices.
 
 \begin{figure}[htbp]
 \centerline{\includegraphics[width=\textwidth]{images/docker_setup.png}}
