@@ -136,11 +136,6 @@
 \newchapter{chap6}
 
 %
-% Appendices
-%
-\newappendix{appendix_a}
-
-%
 % References
 %
 \reffile{references}
@@ -150,5 +145,10 @@
 \immediate\write\@auxout{\string\bibdata{references}}
 \def\addcustomcontentsline{}
 \IfFileExists{thesis.bbl}{\input{thesis.bbl}}{}\makeatother
+
+%
+% Appendices
+%
+\newappendix{appendix_a}
 
 \end{document}

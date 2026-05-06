@@ -37,14 +37,6 @@ One major issue with allowing gradients to accumulate prior to sending them is g
 
 We tested our method on the CarRacing-v3 domain. On this domain, we used a PPO agent to learn how to drive from $96 \times 96$ RGB images. We simulated pipeline parallelism between a CNN feature extractor and actor-critic network running in two separate Docker containers separated by a bridge network, and therefore constrained by a bandwidth-limited connection. With a 90th percentile threshold applied to the buffer with exponential decay, we were able to reduce cumulative data transfer by 35\%, and achieve equivalent or better policy performance than our uncompressed baseline.
 
-\section{Our Approach}
-
-This project uses a technique called selective gradient transmission to alleviate the communication bottleneck. Instead of transmitting each minibatch’s full set of gradients from one machine to another after every minibatch, we have each machine store (accumulate) its gradients locally and then transmit only those gradients deemed most important based on their magnitude relative to some defined percentiles. If a gradient does not exceed its associated percentile it is stored in a ``local buffer'' and continues to be added to as it becomes large enough for transmission.
-
-However, the use of buffers to store gradients can lead to the problem of stale gradients; since gradients that have been in storage for many iterations will likely represent old versions of the optimization space, by the time they are eventually sent they are unlikely to provide useful information about the current version of the optimization space. We propose using a decaying value (exponential decay) to penalize (discount) these older unsent gradients so that when gradients are eventually sent, the buffer contains a representation of the recent version(s) of the optimization space.
-
-Our proposed solution was tested on the CarRacing-v3 environment, which involves learning how to control a car using $96 \times 96$ RGB images from the visual stream. We were able to reduce the network usage by 35\% while maintaining the baseline's quality with this approach.
-
 \section{Thesis Organization}
 
 The remainder of this thesis is organized as follows. Chapter~2 reviews related work in distributed reinforcement learning, communication-efficient training, and pipeline parallelism. Chapter~3 defines the problem formally and quantifies the communication overhead of pipeline parallelism compared to centralized training. Chapter~4 describes our gradient accumulation method with percentile-based sparsification and buffer decay. Chapter~5 presents experimental results on the CarRacing-v3 environment, demonstrating a 35\% reduction in network transfer while maintaining comparable policy performance, and analyzes the effect of buffer decay on gradient accumulation.
