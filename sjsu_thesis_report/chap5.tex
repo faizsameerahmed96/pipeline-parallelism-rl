@@ -80,3 +80,19 @@ The improved performance of the decay variant over the no-decay 90th percentile 
 The 90th percentile configuration without decay ($\lambda = 1.0$) reached an EMA return of 304, which corresponds to about 61\% of the baseline performance. This result is consistent with our prior observations: sending only 10\% of the gradient values reduces the quality of the learning for the CNN feature extractor. That is because the remaining 90\% of gradient dimensions do not receive any update until each individual dimension accumulates enough to cross the threshold. As can be seen by examining the difference in performance between compressed and uncompressed training over time, it appears that the cumulative effect of errors due to missing gradient dimensions increases as training proceeds.
 
 In addition, we ran a series of additional experiments using 0.99 decay with higher percentile thresholds. With the 95th percentile (i.e., sending only 5\% of the gradients), the agent does appear to learn; however, at a much reduced rate than when all gradients were sent. When we used the 99th percentile (i.e., sending only 1\% of gradients), the agent did not learn at all, confirming that there is a minimum amount of gradients required to provide a sufficiently strong learning signal for the CNN feature extractor to perform well. In order to ensure that the baseline and 90th percentile with decay were reproducible across different seeds, we ran both again using a different random seed. Both converged to similar levels of performance. The complete training curves for all five configurations are provided in Appendix~\ref{app:percentile-sweep}.
+
+\section{Generalization to Other Environments}
+
+To verify that our approach is not specific to CarRacing, we evaluated the same gradient compression technique on Enduro (ALE/Enduro-v5), an Atari driving game. Unlike CarRacing, which uses a continuous action space, Enduro has a discrete action space of 9 actions. As shown in Figure~\ref{fig:enduro-returns}, the compressed runs track the baseline closely over 3 million steps, while Figure~\ref{fig:enduro-transfer} shows a consistent 30\% reduction in data transfer.
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\textwidth]{images/enduro_episodic_returns.pdf}}
+\caption{Training performance on Enduro. Compressed configurations track the baseline, demonstrating generalization to discrete action spaces.}
+\label{fig:enduro-returns}
+\end{figure}
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\textwidth]{images/enduro_network_transfer.pdf}}
+\caption{Cumulative data transfer on Enduro. Both compressed configurations achieve approximately 30\% reduction relative to the baseline.}
+\label{fig:enduro-transfer}
+\end{figure}

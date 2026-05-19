@@ -1,0 +1,460 @@
+import os
+import time
+import random
+
+import gymnasium as gym
+import numpy as np
+import psutil
+import torch
+import torch.distributed.rpc as rpc
+import torch.nn as nn
+
+from env import make_env
+from network import ActorCriticNetwork, CNNNetwork
+from torch.distributed.rpc import RRef
+from wandb_utils import initialize_wandb_and_writer
+from args import get_args
+
+
+def _call_method(method, rref, *args, **kwargs):
+    # Runs in remote machine's context
+    return method(rref.local_value(), *args, **kwargs)
+
+def _parameter_rrefs(module):
+    return [RRef(parameter) for parameter in module.parameters()]
+
+def _remote_method(method, rref, *args, **kwargs):
+    owner = rref.owner()
+    return rpc.rpc_sync(owner, _call_method, args=(method, rref, *args), kwargs=kwargs)
+
+def _tensor_bytes(t):
+    """Calculate byte size of a tensor, dict of tensors, or tuple/list of tensors."""
+    if t is None:
+        return 0
+    if isinstance(t, torch.Tensor):
+        return t.nelement() * t.element_size()
+    if isinstance(t, dict):
+        return sum(_tensor_bytes(v) for v in t.values())
+    if isinstance(t, (tuple, list)):
+        return sum(_tensor_bytes(v) for v in t)
+    return 0
+
+
+def main():
+    args = get_args()
+
+    # Set seeds for deterministic behavior
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    torch.cuda.manual_seed_all(args.seed)
+    torch.use_deterministic_algorithms(False)
+
+    run_name = f"{int(time.time())}-grad-compression={args.gradient_compression_technique}"
+    print(f"Run: {run_name}")
+    
+    writer = initialize_wandb_and_writer(args, run_name)
+
+    device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
+
+    envs = gym.vector.AsyncVectorEnv(
+        [
+            make_env(args.env_id, i, False, run_name, args.gamma)
+            for i in range(args.num_envs)
+        ]
+    )
+
+    cnn_network = CNNNetwork(envs, learning_rate=args.learning_rate).to(device)
+    
+    remote_actor_critic_network_rref = rpc.remote("worker1", ActorCriticNetwork)
+    print(f"Remote reference to worker1 obtained.", flush=True)
+    
+    start_iteration = load_existing_checkpoints(args, cnn_network, remote_actor_critic_network_rref)
+
+    optimizer = cnn_network.optimizer
+
+    # store information from rollout
+    obs = torch.zeros(
+        (args.num_steps, args.num_envs) + envs.single_observation_space.shape
+    ).to(device)
+    actions = torch.zeros(
+        (args.num_steps, args.num_envs)
+    ).to(device)
+    logprobs = torch.zeros((args.num_steps, args.num_envs)).to(device)
+    rewards = torch.zeros((args.num_steps, args.num_envs)).to(device)
+    dones = torch.zeros((args.num_steps, args.num_envs)).to(device)
+    values = torch.zeros((args.num_steps, args.num_envs)).to(device)
+
+    global_step = (start_iteration - 1) * args.batch_size  # Resume global step count
+    start_time = time.time()
+    next_obs, _ = envs.reset(seed=args.seed)
+    next_obs = torch.Tensor(next_obs).to(device)
+    next_done = torch.zeros(args.num_envs).to(device)
+    
+    # Track network transfer (cumulative)
+    net_io_start = psutil.net_io_counters()
+    bytes_start = net_io_start.bytes_sent + net_io_start.bytes_recv
+
+    # Track calculated data transfer (application-level)
+    calculated_bytes_sent = 0  # machine0 → machine1
+    calculated_bytes_recv = 0  # machine1 → machine0
+
+    # Local state for surprise compression
+    local_running_mean = None
+    local_running_std = None
+    surprise_minibatch_counter = 0
+
+    # Resume training from the checkpoint iteration
+    for iteration in range(start_iteration, args.num_iterations + 1):
+        print(f"Iteration {iteration}/{args.num_iterations}", flush=True)
+
+        # Save model checkpoint if save_model_freq is specified
+        if args.save_model_freq is not None and iteration % args.save_model_freq == 0:
+            save_checkpoint(args, iteration, run_name, cnn_network, remote_actor_critic_network_rref)
+
+        # Rollout
+        rollout_start = time.time()
+        rollout_cnn_time = 0
+        rollout_rpc_time = 0
+        rollout_env_time = 0
+        for step in range(0, args.num_steps):
+            global_step += args.num_envs
+            obs[step] = next_obs
+            dones[step] = next_done
+
+            with torch.no_grad():
+                t0 = time.time()
+                cnn_features = cnn_network(next_obs)
+                rollout_cnn_time += time.time() - t0
+
+                t0 = time.time()
+                action, logprob, _, value = _remote_method(
+                    ActorCriticNetwork.get_action_and_value,
+                    remote_actor_critic_network_rref,
+                    cnn_features,
+                    no_grad=True
+                )
+                rollout_rpc_time += time.time() - t0
+                calculated_bytes_sent += _tensor_bytes(cnn_features)
+                calculated_bytes_recv += _tensor_bytes((action, logprob, value))
+                values[step] = value.flatten()
+
+            actions[step] = action
+            logprobs[step] = logprob
+
+            t0 = time.time()
+            next_obs, reward, terminations, truncations, infos = envs.step(
+                action.cpu().numpy()
+            )
+            rollout_env_time += time.time() - t0
+            next_done = np.logical_or(terminations, truncations)
+            rewards[step] = torch.tensor(reward).to(device).view(-1)
+            next_obs, next_done = torch.Tensor(next_obs).to(device), torch.Tensor(
+                next_done
+            ).to(device)
+
+            if "episode" in infos:
+                ep_infos = infos["episode"]
+                finished_mask = infos["_episode"]
+                for i, done in enumerate(finished_mask):
+                    if done:
+                        print(
+                            f"global_step={global_step}, env={i}, episodic_return={ep_infos['r'][i]:.0f}",
+                            flush=True,
+                        )
+                        writer.add_scalar(
+                            "charts/episodic_return", ep_infos["r"][i], global_step
+                        )
+
+        rollout_time = time.time() - rollout_start
+        print(f"ROLLOUT: {rollout_time:.2f}s (cnn: {rollout_cnn_time:.2f}s, rpc: {rollout_rpc_time:.2f}s, env: {rollout_env_time:.2f}s)", flush=True)
+        print("BOOTSTRAPPING")
+        # bootstrap value if not done
+        with torch.no_grad():
+            cnn_features = cnn_network(next_obs)
+            next_value = _remote_method(
+                ActorCriticNetwork.get_value, remote_actor_critic_network_rref, cnn_features, no_grad=True
+            )
+            calculated_bytes_sent += _tensor_bytes(cnn_features)
+            calculated_bytes_recv += _tensor_bytes(next_value)
+            next_value = next_value.reshape(1, -1)
+            advantages = torch.zeros_like(rewards).to(device)
+            lastgaelam = 0
+            for t in reversed(range(args.num_steps)):
+                if t == args.num_steps - 1:
+                    nextnonterminal = 1.0 - next_done
+                    nextvalues = next_value
+                else:
+                    nextnonterminal = 1.0 - dones[t + 1]
+                    nextvalues = values[t + 1]
+                delta = (
+                    rewards[t] + args.gamma * nextvalues * nextnonterminal - values[t]
+                )
+                advantages[t] = lastgaelam = (
+                    delta + args.gamma * args.gae_lambda * nextnonterminal * lastgaelam
+                )
+            returns = advantages + values
+
+        # flatten the batch
+        b_obs = obs.reshape((-1,) + envs.single_observation_space.shape)
+        b_logprobs = logprobs.reshape(-1)
+        b_actions = actions.reshape(-1).long()
+        b_advantages = advantages.reshape(-1)
+        b_returns = returns.reshape(-1)
+        b_values = values.reshape(-1)
+
+        # Optimizing the policy and value network
+        b_inds = np.arange(args.batch_size)
+        clipfracs = []
+        
+        # Initialize loss variables for logging
+        pg_loss = torch.tensor(0.0)
+        v_loss = torch.tensor(0.0)
+        entropy_loss = torch.tensor(0.0)
+
+        gae_time = time.time() - rollout_start - rollout_time
+        print(f"GAE: {gae_time:.2f}s", flush=True)
+        update_start = time.time()
+        update_cnn_time = 0
+        update_rpc_time = 0
+        update_backward_time = 0
+        print("UPDATING THE N/W")
+        for epoch in range(args.update_epochs):
+            np.random.shuffle(b_inds)
+            for start in range(0, args.batch_size, args.minibatch_size):
+                end = start + args.minibatch_size
+                mb_inds = b_inds[start:end]
+
+                # Forward pass through CNN with gradients enabled
+                t0 = time.time()
+                cnn_features = cnn_network(b_obs[mb_inds])
+                update_cnn_time += time.time() - t0
+                
+                # Determine whether to use gradient statistics based on warm start
+                use_gradient_stats = args.gradient_compression_technique == 'stats' and global_step >= args.warm_start_steps
+                use_accumulate_grads = args.gradient_compression_technique == 'accumulate-grads' and global_step >= args.warm_start_steps
+                use_surprise = args.gradient_compression_technique == 'surprise' and global_step >= args.warm_start_steps
+                surprise_warmup = args.gradient_compression_technique == 'surprise' and global_step < args.warm_start_steps
+                
+                # Send features and loss components to machine1 for backward pass via RRef
+                # Machine1 will compute loss, backward, and return feature gradients
+                t0 = time.time()
+                feature_grads, feature_grads_stats, relevant_grads_from_global_feature_grads, pg_loss_val, v_loss_val, entropy_loss_val, buffer_stats = _remote_method(
+                    ActorCriticNetwork.backward_and_step,
+                    remote_actor_critic_network_rref,
+                    cnn_features.detach(),
+                    b_actions[mb_inds],
+                    b_logprobs[mb_inds],
+                    b_advantages[mb_inds],
+                    b_returns[mb_inds],
+                    b_values[mb_inds],
+                    args.clip_coef,
+                    args.vf_coef,
+                    args.ent_coef,
+                    args.norm_adv,
+                    args.clip_vloss,
+                    gradient_stats=use_gradient_stats,
+                    accumulated_grads=use_accumulate_grads,
+                    accumulate_grads_percentile=args.accumulate_grads_percentile,
+                    decay_buffer=args.decay_buffer,
+                    surprise_compress=use_surprise,
+                    surprise_compress_percentile=args.surprise_compress_percentile,
+                    surprise_compress_ema_alpha=args.surprise_compress_ema_alpha,
+                    surprise_sync_interval=args.surprise_sync_interval,
+                    surprise_minibatch_counter=surprise_minibatch_counter,
+                    surprise_warmup=surprise_warmup
+                )
+                update_rpc_time += time.time() - t0
+                calculated_bytes_sent += _tensor_bytes((cnn_features, b_actions[mb_inds], b_logprobs[mb_inds], b_advantages[mb_inds], b_returns[mb_inds], b_values[mb_inds]))
+                calculated_bytes_recv += _tensor_bytes((feature_grads, feature_grads_stats, relevant_grads_from_global_feature_grads))
+
+                # Analyze feature_grads percentiles
+                # if feature_grads is not None:
+                #     grads_flat = feature_grads.abs().flatten()
+                #     p25 = torch.quantile(grads_flat, 0.25).item()
+                #     p50 = torch.quantile(grads_flat, 0.50).item()
+                #     p75 = torch.quantile(grads_flat, 0.75).item()
+                #     p90 = torch.quantile(grads_flat, 0.90).item()
+                #     p99 = torch.quantile(grads_flat, 0.99).item()
+                    
+                #     # Log to terminal
+                #     print(f"Feature Grads Percentiles - 25th: {p25:.6f}, 50th: {p50:.6f}, 75th: {p75:.6f}, 90th: {p90:.6f}, 99th: {p99:.6f}", flush=True)
+                    
+                #     # Log to TensorBoard/wandb for visualization over time
+                #     writer.add_scalar("gradients/p25_abs", p25, global_step)
+                #     writer.add_scalar("gradients/p50_abs", p50, global_step)
+                #     writer.add_scalar("gradients/p75_abs", p75, global_step)
+                #     writer.add_scalar("gradients/p90_abs", p90, global_step)
+                #     writer.add_scalar("gradients/p99_abs", p99, global_step)
+                
+
+                if use_gradient_stats:
+                    # feature_grads_stats shape: (2, 4096) -> [mean, std]
+                    # Need to expand to: (minibatch_size, 4096)
+                    grad_mean = feature_grads_stats[0:1, :]
+                    grad_std = feature_grads_stats[1:2, :]
+                    
+                    minibatch_size = cnn_features.shape[0]
+                    feature_grads = torch.randn(minibatch_size, grad_mean.shape[1], device=device) * grad_std + grad_mean
+                
+                # Reconstruct sparse gradients
+                if relevant_grads_from_global_feature_grads is not None:
+                    sparse_data = relevant_grads_from_global_feature_grads
+                    sparse_indices = sparse_data['indices'].long()
+                    sparse_values = sparse_data['values']
+                    shape = sparse_data['shape']
+
+                    if sparse_data.get('technique') == 'surprise':
+                        # Update local stats if synced
+                        if 'running_mean' in sparse_data:
+                            local_running_mean = sparse_data['running_mean'].to(device)
+                            local_running_std = sparse_data['running_std'].to(device)
+
+                        # Reconstruct: sample from N(μ, σ) then overwrite sent positions
+                        minibatch_size = cnn_features.shape[0]
+                        if local_running_mean is not None:
+                            feature_grads = torch.randn(minibatch_size, local_running_mean.shape[0], device=device) * local_running_std + local_running_mean
+                        else:
+                            feature_grads = torch.zeros(shape, device=device)
+
+                        # Overwrite with actual gradient values at sent positions
+                        feature_grads[sparse_indices[:, 0], sparse_indices[:, 1]] = sparse_values
+
+                        surprise_minibatch_counter += 1
+                    else:
+                        # Accumulate-grads reconstruction: zero-fill + scatter
+                        feature_grads = torch.zeros(shape, device=device)
+                        feature_grads[sparse_indices[:, 0], sparse_indices[:, 1]] = sparse_values
+
+                
+                t0 = time.time()
+                optimizer.zero_grad()
+                cnn_features.backward(feature_grads)
+
+                nn.utils.clip_grad_norm_(cnn_network.parameters(), args.max_grad_norm)
+
+                # Optimizer step for CNN network
+                optimizer.step()
+                update_backward_time += time.time() - t0
+                
+                pg_loss = torch.tensor(pg_loss_val)
+                v_loss = torch.tensor(v_loss_val)
+                entropy_loss = torch.tensor(entropy_loss_val)
+
+            # if args.target_kl is not None and approx_kl > args.target_kl:
+            #     break
+        
+        update_time = time.time() - update_start
+        print(f"UPDATE: {update_time:.2f}s (cnn: {update_cnn_time:.2f}s, rpc: {update_rpc_time:.2f}s, backward: {update_backward_time:.2f}s)", flush=True)
+        writer.add_scalar("timing/rollout_s", rollout_time, global_step)
+        writer.add_scalar("timing/gae_s", gae_time, global_step)
+        writer.add_scalar("timing/update_s", update_time, global_step)
+
+        # Save gradient buffer snapshot every 3 iterations
+        if use_accumulate_grads and iteration % 3 == 0:
+            grad_buffer = _remote_method(
+                ActorCriticNetwork.get_global_feature_grads,
+                remote_actor_critic_network_rref
+            )
+            if grad_buffer is not None:
+                buffer_dir = f"/workspace/runs/{run_name}/grad_buffers/"
+                os.makedirs(buffer_dir, exist_ok=True)
+                torch.save(grad_buffer, f"{buffer_dir}iteration_{iteration}.pt")
+
+        # Log training metrics
+        writer.add_scalar("losses/value_loss", v_loss.item(), global_step)
+        writer.add_scalar("losses/policy_loss", pg_loss.item(), global_step)
+        writer.add_scalar("losses/entropy", entropy_loss.item(), global_step)
+
+        # Log buffer stats (from the last minibatch of the last epoch)
+        if buffer_stats is not None:
+            for key, val in buffer_stats.items():
+                writer.add_scalar(f"buffer/{key}", val, global_step)
+
+        y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
+        var_y = np.var(y_true)
+        # explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
+
+        time_elapsed = time.time() - start_time
+        print(f"Time elapsed: {time_elapsed:.2f}s", flush=True)
+        writer.add_scalar("charts/time_elapsed", time_elapsed, iteration)
+        # writer.add_scalar("losses/explained_variance", explained_var, global_step)
+        writer.add_scalar("charts/learning_rate", args.learning_rate, global_step)
+        sps = int(global_step / time_elapsed)
+        print(f"SPS: {sps}")
+        writer.add_scalar("charts/SPS", sps, global_step)
+        
+        # Track cumulative network transfer
+        net_io_current = psutil.net_io_counters()
+        bytes_current = net_io_current.bytes_sent + net_io_current.bytes_recv
+        total_transfer_mb = (bytes_current - bytes_start) / (1024 * 1024)
+        writer.add_scalar("charts/network_transfer_in_mb", total_transfer_mb, global_step)
+
+        # Track calculated data transfer (application-level)
+        writer.add_scalar("charts/calculated_data_transfer_total_mb", (calculated_bytes_sent + calculated_bytes_recv) / (1024 * 1024), global_step)
+        
+
+    # Save final checkpoint at the end of training
+    save_checkpoint(args, args.num_iterations, run_name, cnn_network, remote_actor_critic_network_rref)
+
+    writer.close()
+    print("Machine shutting down", flush=True)
+    time.sleep(1000)
+
+
+def load_existing_checkpoints(args, cnn_network, remote_actor_critic_network_rref):
+    """Load existing checkpoints for CNN and ActorCritic networks if provided."""
+    start_iteration = 0
+    
+    # Load CNN checkpoint if provided and track starting iteration
+    if args.cnn_network_checkpoint_path is not None:
+        start_iteration = cnn_network.load_model(args.cnn_network_checkpoint_path)
+        print(f"Resuming from iteration {start_iteration}", flush=True)
+    
+    # Load ActorCritic checkpoint if provided
+    if args.agent_network_checkpoint_path is not None:
+        loaded_iteration = _remote_method(
+            ActorCriticNetwork.load_model,
+            remote_actor_critic_network_rref,
+            args.agent_network_checkpoint_path
+        )
+        # Verify both checkpoints are from the same iteration
+        if start_iteration != loaded_iteration:
+            raise Exception("CNN and ActorCritic checkpoints are from different iterations!")
+    
+    return start_iteration
+
+
+def save_checkpoint(args, iteration, run_name, cnn_network, remote_actor_critic_network_rref):
+    """Save model checkpoints for both CNN and ActorCritic networks."""
+    checkpoint_dir = f"/workspace/runs/{run_name}/models/"
+    os.makedirs(checkpoint_dir, exist_ok=True)
+
+    # Save CNN network
+    cnn_network.save_model(checkpoint_dir, iteration, args)
+    
+    # Save ActorCritic network remotely
+    _remote_method(
+        ActorCriticNetwork.save_model,
+        remote_actor_critic_network_rref,
+        checkpoint_dir,
+        iteration
+    )
+
+
+def setup():
+    rank = int(os.environ["RANK"])
+    options = rpc.TensorPipeRpcBackendOptions()
+    if torch.cuda.is_available():
+        options.set_device_map("worker1", {0: 0})
+    rpc.init_rpc(
+        name=f"worker{rank}", rank=rank, world_size=int(os.environ["WORLD_SIZE"]),
+        rpc_backend_options=options
+    )
+    print("RPC initialized successfully.", flush=True)
+
+
+if __name__ == "__main__":
+    print("Machine 0 running!", flush=True)
+    setup()
+    main()

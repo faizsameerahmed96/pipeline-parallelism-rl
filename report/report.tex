@@ -63,7 +63,7 @@ Pipeline parallelism has emerged as a critical technique for training models exc
 
 Recent work addresses distributed learning in resource-constrained settings. Lim et al. \cite{lim2020} applied federated learning principles to RL for IoT devices, enabling multiple agents to collaboratively learn optimal control policies while keeping data local, addressing device-specific dynamics variations. Feng et al. \cite{feng2023} designed IoTSL, an efficient split learning system for resource-constrained IoT devices, optimizing the split learning paradigm to handle non-IID data distribution and reduce communication requirements specific to IoT constraints.
 
-Our work differs from prior approaches by specifically addressing the communication bottleneck in pipeline-parallel RL training through selective gradient accumulation. While existing gradient compression techniques focus on compressing all gradients uniformly or through quantization, our approach accumulates gradients over time and transmits only high-magnitude values above configurable percentile thresholds, tailored to the unique characteristics of RL training with repeated epochs.
+Our work differs from prior approaches by specifically addressing the communication bottleneck in pipeline-parallel RL training through selective gradient accumulation. While existing gradient compression techniques focus on compressing all gradients uniformly or through quantization, our approach accumulates gradients over time and transmits only high-magnitude values above configurable percentile thresholds, tailored to the unique characteristics of on-policy DRL training with repeated epochs.
 
 \section{Problem Statement}
 

@@ -42,7 +42,7 @@ Setting $\lambda = 1.0$ represents standard accumulation without any decay. Valu
 
 \textbf{Warm Start:} To create a stable initial condition during training, we keep all full gradient communications for an initial time called a ``warm start'' period after which sparse communication will be allowed. The model has a chance to develop some reasonably good weights before they are compressed after the warm start period.
 
-The main advantage of our method is that reinforcement learning methods such as PPO use past experiences repeatedly throughout every epoch of training, resulting in repeated gradient signals for very similar data. As such, this creates a natural opportunity for accumulation. By delaying transmissions until sufficient statistical significance is reached, we can greatly reduce communication while maintaining a high quality of updates.
+The main advantage of our method is that reinforcement learning methods such as PPO use a set of experiences repeatedly throughout every epoch of training, resulting in repeated gradient signals for very similar data. As such, this creates a natural opportunity for accumulation. By delaying transmissions until sufficient statistical significance is reached, we can greatly reduce communication while maintaining a high quality of updates.
 
 \section{Experimental Setup}
 
@@ -62,7 +62,25 @@ Action Space & Box([-1, 0, 0], 1.0, (3,), float32) \\
 \end{tabular}
 \end{table}
 
-The CarRacing-v3 environment provides a continuous visual perception from an image input to the policy. This mirrors real-world applications including autonomous vehicles, robotics and other forms of intelligent systems where large amounts of high-dimensional image data will have to be exchanged among different nodes within a network. Therefore, it serves as a good model for testing communication efficiency through pipeline-parallel training. Specifically, the CNN feature extractor will need to analyze image inputs at every timestep as well as transmit activation values and gradient information throughout the network split.
+To evaluate generalization beyond continuous control, we also train an agent on the Enduro environment (ALE/Enduro-v5), an Atari driving game where the agent must pass as many cars as possible before time runs out. Unlike CarRacing, Enduro uses a discrete action space of 9 actions and grayscale frame-stacked observations. See Table~\ref{tab:enduro-env-properties} for environment properties. The warm start period for Enduro is set to 500,000 timesteps due to the longer exploration phase required before any learning signal emerges.
+
+\begin{table}[htbp]
+\centering
+\caption{Enduro (ALE/Enduro-v5) environment properties.}
+\label{tab:enduro-env-properties}
+\begin{tabular}{ll}
+\toprule
+\textbf{Property} & \textbf{Value} \\
+\midrule
+Observation Space & Box(0, 255, (4, 84, 84), uint8) \\
+Action Space & Discrete(9) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Both environments provide visual perception from image inputs to the policy, mirroring real-world applications including autonomous vehicles, robotics, and other intelligent systems where large amounts of high-dimensional image data must be exchanged among different nodes within a network. Therefore, they serve as good testbeds for evaluating communication efficiency in pipeline-parallel training. Specifically, the CNN feature extractor must analyze image inputs at every timestep and transmit activation values and gradient information throughout the network split.
+
+Training uses PPO with 10 update epochs per iteration, meaning the collected batch of experience is reused 10 times for gradient updates before new data is collected.
 
 To simulate pipeline parallelism across bandwidth-constrained devices, we created a multi-container environment using Docker Compose. The environment contains two containers linked together by a bridge network. As depicted in Figure~\ref{fig:docker-setup}, Machine~0 contains both the environment and the CNN feature extractor, while Machine~1 contains the actor-critic neural network. The transfer of information between the two machines utilizes PyTorch's distributed RPC (Remote Procedure Call) interface for transferring tensors across networks. Thus, this method can provide an accurate representation of the bandwidth limitations present when communicating between multiple devices.
 
