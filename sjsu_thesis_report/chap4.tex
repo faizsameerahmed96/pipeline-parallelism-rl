@@ -62,8 +62,7 @@ Action Space & Box([-1, 0, 0], 1.0, (3,), float32) \\
 \end{tabular}
 \end{table}
 
-To evaluate generalization beyond continuous control, we also train an agent on the Enduro environment (ALE/Enduro-v5), an Atari driving game where the agent must pass as many cars as possible before time runs out. Unlike CarRacing, Enduro uses a discrete action space of 9 actions and grayscale frame-stacked observations. See Table~\ref{tab:enduro-env-properties} for environment properties. The warm start period for Enduro is set to 500,000 timesteps due to the longer exploration phase required before any learning signal emerges.
-
+To evaluate generalization beyond continuous control, we also train an agent on the Enduro environment (ALE/Enduro-v5), an Atari driving game where the agent must pass as many cars as possible before time runs out. Unlike CarRacing, Enduro uses a discrete action space of 9 actions and grayscale frame-stacked observations. See Table~\ref{tab:enduro-env-properties} for environment properties.
 \begin{table}[htbp]
 \centering
 \caption{Enduro (ALE/Enduro-v5) environment properties.}
@@ -78,7 +77,7 @@ Action Space & Discrete(9) \\
 \end{tabular}
 \end{table}
 
-Both environments provide visual perception from image inputs to the policy, mirroring real-world applications including autonomous vehicles, robotics, and other intelligent systems where large amounts of high-dimensional image data must be exchanged among different nodes within a network. Therefore, they serve as good testbeds for evaluating communication efficiency in pipeline-parallel training. Specifically, the CNN feature extractor must analyze image inputs at every timestep and transmit activation values and gradient information throughout the network split.
+Both environments provide visual perception from image inputs to the policy, mirroring real-world applications including autonomous vehicles, robotics, and other intelligent systems where large amounts of high-dimensional image data must be exchanged among different nodes within a network.
 
 Training uses PPO with 10 update epochs per iteration, meaning the collected batch of experience is reused 10 times for gradient updates before new data is collected.
 
@@ -100,7 +99,7 @@ Processes raw observations with 3 convolutional layers: Conv2d(4$\rightarrow$32,
 \textbf{Actor-Critic Network on Machine~1:}
 Takes the 4,096-dimensional features as input to produce a 3-dimensional continuous action (steer, accelerate, brake) using a two-layer Multi-Layer Perceptron (MLP) (4096$\rightarrow$512$\rightarrow$3) with Gaussian policy parameterization and tanh squashing. The critic produces a state value estimate through another identical MLP (4096$\rightarrow$512$\rightarrow$1). Both networks use orthogonal initializations for stability during training.
 
-During policy rollout, Machine~0 transmits the 4,096-dimensional features to Machine~1 so it can select actions. This saves about a factor of nine in terms of bandwidth because it transmits 4,096 features instead of $4\times96\times96$ raw pixel values. In contrast, during training, both machines need to communicate with each other. First, the forward activations need to be communicated from Machine~0 to Machine~1 for each mini-batch. Second, the backward gradients also need to be communicated from Machine~1 back to Machine~0 for all ten epochs. It is this communication during the training phase which results in the approximately 66~GB overhead discussed in Chapter~3.
+During policy rollout, Machine~0 transmits the 4,096-dimensional features to Machine~1 so it can select actions. This saves about a factor of nine in terms of bandwidth because it transmits 4,096 features instead of $4\times96\times96$ raw pixel values. In contrast, during training, both machines need to communicate with each other. First, the forward activations need to be communicated from Machine~0 to Machine~1 for each mini-batch. Second, the backward gradients also need to be communicated from Machine~1 back to Machine~0. It is this gradient communication during the training phase that we aim to reduce.
 
 \section{Compression Configuration}
 
